@@ -11,9 +11,9 @@ const generateToken = (userId, options = {}) => {
     },
     process.env.JWT_SECRET,
     {
-      expiresIn: options.purpose === "complete-profile"
-        ? "15m"
-        : "30d"
+      expiresIn: "1y"// options.purpose === "complete-profile"
+      //   ? "15m"
+      //   : "30d"
     }
   );
 };

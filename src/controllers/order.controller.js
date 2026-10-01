@@ -151,7 +151,7 @@ const createOrder = async (req, res, next) => {
     let subtotal = 0;
     let discount = 0;
 
-    for (const requestedItem of items) {
+        if (!name) {
       const {
         productId,
         quantity,
@@ -235,7 +235,6 @@ const createOrder = async (req, res, next) => {
           dealPrice: null,
         });
 
-        continue;
       }
 
       // ------------------------------------------------------
@@ -529,7 +528,7 @@ const createOrder = async (req, res, next) => {
       )
         .populate(
           "customerId",
-          "firstName lastName phone email"
+          "name phone email"
         )
         .populate(
           "addressId"
@@ -640,7 +639,7 @@ const getMyOrderById = async (
       })
         .populate(
           "customerId",
-          "firstName lastName phone email"
+          "name phone email"
         )
         .populate(
           "addressId"
@@ -726,7 +725,7 @@ const getAllOrders = async (
       await Order.find(filter)
         .populate(
           "customerId",
-          "firstName lastName phone email"
+          "name phone email"
         )
         .sort({
           createdAt: -1,
@@ -776,7 +775,7 @@ const getOrderById = async (
       await Order.findById(id)
         .populate(
           "customerId",
-          "firstName lastName phone email"
+          "name phone email"
         )
         .populate(
           "addressId"
@@ -812,7 +811,7 @@ const getOrderById = async (
       })
         .populate(
           "changedBy",
-          "firstName lastName phone role"
+          "name phone role"
         )
         .sort({
           createdAt: 1,
