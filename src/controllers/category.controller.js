@@ -14,6 +14,7 @@ const createCategory = async (req, res, next) => {
       parentCategoryId,
       isActive,
       sortOrder,
+      topCategory,
     } = req.body;
 
     if (!nameEn || !nameUr) {
@@ -57,6 +58,7 @@ const createCategory = async (req, res, next) => {
       parentCategoryId: parentId,
       isActive:
         isActive !== undefined ? isActive : true,
+      topCategory: topCategory === true || topCategory === "true",
       sortOrder:
         sortOrder !== undefined ? Number(sortOrder) : 0,
       image: req.file ?  `/uploads/${req.file.filename}` : null,
@@ -106,6 +108,28 @@ const getMainCategories = async (req, res, next) => {
   try {
     const categories = await Category.find({
       parentCategoryId: null,
+    }).sort({
+      sortOrder: 1,
+      nameEn: 1,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: categories,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ========================================
+// GET TOP CATEGORIES ONLY
+// ========================================
+const getTopCategories = async (req, res, next) => {
+  try {
+    const categories = await Category.find({
+      topCategory: true,
+      isActive: true,
     }).sort({
       sortOrder: 1,
       nameEn: 1,
@@ -268,6 +292,48 @@ const updateCategory = async (req, res, next) => {
 };
 
 // ========================================
+// UPDATE TOP CATEGORY FLAG
+// ========================================
+const updateTopCategory = async (req, res, next) => {
+  try {
+    const { topCategory } = req.body;
+
+    if (
+      topCategory !== true &&
+      topCategory !== false &&
+      topCategory !== "true" &&
+      topCategory !== "false"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "topCategory must be a boolean",
+      });
+    }
+
+    const category = await Category.findByIdAndUpdate(
+      req.params.id,
+      { topCategory: topCategory === true || topCategory === "true" },
+      { new: true }
+    );
+
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Top category updated successfully",
+      data: category,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ========================================
 // DELETE CATEGORY
 // ========================================
 const deleteCategory = async (req, res, next) => {
@@ -311,8 +377,10 @@ module.exports = {
   createCategory,
   getCategories,
   getMainCategories,
+  getTopCategories,
   getSubCategories,
   getCategoryById,
   updateCategory,
+  updateTopCategory,
   deleteCategory,
 };

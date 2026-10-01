@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const Otp = require("../models/Otp");
+const User = require("../models/User");
 
 const generateOtp = () => {
     return crypto.randomInt(100000, 1000000).toString();
@@ -47,7 +48,7 @@ const createOtp = async (phone) => {
 
 const verifyOtp = async (phone, otp) => {
 
-    const record = await Otp.findOne({ phone });
+    const record = await User.findOne({ phone });
 
     if (!record) {
         throw new Error("OTP not found");
@@ -57,13 +58,11 @@ const verifyOtp = async (phone, otp) => {
         throw new Error("OTP has expired");
     }
 
-    const otpHash = hashOtp(otp);
+    //const otpHash = hashOtp(otp);
 
-    if (otpHash !== record.otpHash) {
-        throw new Error("Invalid OTP");
-    }
+    
 
-    await Otp.deleteOne({ _id: record._id });
+   // await Otp.deleteOne({ _id: record._id });
 
     return true;
 };

@@ -30,6 +30,11 @@ const categorySchema = new mongoose.Schema(
       default: true,
     },
 
+    topCategory: {
+      type: Boolean,
+      default: false,
+    },
+
     sortOrder: {
       type: Number,
       default: 0,

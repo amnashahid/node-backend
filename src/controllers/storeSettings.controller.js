@@ -23,7 +23,10 @@ const getStoreSettings = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: settings,
+      data: {
+        ...settings.toObject(),
+        StoreName: settings.storeName,
+      },
     });
   } catch (error) {
     next(error);
@@ -38,6 +41,7 @@ const updateStoreSettings = async (req, res, next) => {
   try {
     const {
       storeName,
+      StoreName,
       storeNotes,
       latitude,
       longitude,
@@ -46,11 +50,13 @@ const updateStoreSettings = async (req, res, next) => {
       isActive,
     } = req.body;
 
+    const resolvedStoreName = storeName || StoreName;
+
     // ================================
     // VALIDATION
     // ================================
 
-    if (!storeName || !storeName.trim()) {
+    if (!resolvedStoreName || !resolvedStoreName.trim()) {
       return res.status(400).json({
         success: false,
         message: "Store name is required",
@@ -107,7 +113,7 @@ const updateStoreSettings = async (req, res, next) => {
     let settings = await StoreSettings.findOne();
 
     if (settings) {
-      settings.storeName = storeName.trim();
+      settings.storeName = resolvedStoreName.trim();
       settings.storeNotes = storeNotes || "";
       settings.latitude = lat;
       settings.longitude = lng;
@@ -125,7 +131,7 @@ const updateStoreSettings = async (req, res, next) => {
       // ================================
 
       settings = await StoreSettings.create({
-        storeName: storeName.trim(),
+        storeName: resolvedStoreName.trim(),
         storeNotes: storeNotes || "",
         latitude: lat,
         longitude: lng,

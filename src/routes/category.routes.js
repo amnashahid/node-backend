@@ -6,9 +6,11 @@ const {
   createCategory,
   getCategories,
   getMainCategories,
+  getTopCategories,
   getSubCategories,
   getCategoryById,
   updateCategory,
+  updateTopCategory,
   deleteCategory,
 } = require("../controllers/category.controller");
 
@@ -34,6 +36,13 @@ router.get(
 //   authMiddleware,
 //   getMainCategories
 // );
+
+// Get top categories (must be before "/:id")
+router.get(
+  "/top",
+  authMiddleware,
+  getTopCategories
+);
 
 // Get subcategories of a category
 router.get(
@@ -61,6 +70,14 @@ router.post(
   //roleMiddleware("admin"),
  uploadImage.single("image"),
   createCategory
+);
+
+// Toggle top category flag
+router.patch(
+  "/:id/top",
+  authMiddleware,
+  roleMiddleware("admin"),
+  updateTopCategory
 );
 
 // Update category/subcategory

@@ -103,8 +103,7 @@ const getUserById = async (req, res, next) => {
 const createUser = async (req, res, next) => {
   try {
     const {
-      firstName,
-      lastName,
+      name,
       phone,
       email,
       language,
@@ -117,10 +116,10 @@ const createUser = async (req, res, next) => {
     // VALIDATION
     // ----------------------------------------
 
-    if (!firstName || !firstName.trim()) {
+    if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
-        message: "First name is required",
+        message: "Name is required",
       });
     }
 
@@ -239,8 +238,8 @@ const createUser = async (req, res, next) => {
     const user = await User.create({
       firstName: firstName.trim(),
 
-      lastName:
-        lastName?.trim() || "",
+      name:
+        name?.trim() || "",
 
       phone: phone.trim(),
 
@@ -295,8 +294,7 @@ const updateUser = async (req, res, next) => {
     const { id } = req.params;
 
     const {
-      firstName,
-      lastName,
+      name,
       phone,
       email,
       language,
@@ -323,12 +321,12 @@ const updateUser = async (req, res, next) => {
     // ----------------------------------------
 
     if (
-      firstName !== undefined &&
-      !firstName.trim()
+      name !== undefined &&
+      !name.trim()
     ) {
       return res.status(400).json({
         success: false,
-        message: "First name is required",
+        message: "Name is required",
       });
     }
 
@@ -385,15 +383,15 @@ const updateUser = async (req, res, next) => {
     // BASIC INFORMATION
     // ----------------------------------------
 
-    if (firstName !== undefined) {
-      user.firstName =
-        firstName.trim();
+    if (name !== undefined) {
+      user.name =
+        name.trim();
     }
 
-    if (lastName !== undefined) {
-      user.lastName =
-        lastName?.trim() || "";
-    }
+    // if (lastName !== undefined) {
+    //   user.lastName =
+    //     lastName?.trim() || "";
+    // }
 
     if (email !== undefined) {
       user.email =

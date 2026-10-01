@@ -36,6 +36,7 @@ router.use("/delivery-charges", deliveryChargeRoutes);
 router.use("/delivery-slots", deliverySlotRoutes);
 router.use("/addresses", addressRoutes);
 router.use("/orders", orderRoutes);
+router.use("/sections", require("./section.routes"));
 
   
 module.exports = router;

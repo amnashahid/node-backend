@@ -139,48 +139,54 @@ const completeProfile = async (req, res, next) => {
 
     try {
 
-
+const id = req.user._id;
         const {
-            firstName,
-            lastName,
+            name,
             email,
-            location,
             latitude,
             longitude,
-            address,
-            id
+            addresses,
+            
         } = req.body;
 
-        const userId = req.body.id;
-        if (!firstName) {
+        const userId = id;
+        if (!name) {
             return res.status(400).json({
                 success: false,
-                message: "First name is required"
+                message: "Name is required"
             });
         }
 
-        const user = await User.findByIdAndUpdate(
-            userId,
+        
+        const completeProfile = await  User.findOne({
+        _id: req.user._id
+        });
+
+        await User.updateOne(
+            { _id: userId },
             {
-                firstName,
-                lastName,
+                name,
                 email,
-                location,
                 latitude,
                 longitude,
-                address,
+                addresses,
                 profileCompleted: true
-            },
-            {
-                new: true,
-                runValidators: true
             }
-        ).select("-__v");
+        );
+
 
         return res.status(200).json({
             success: true,
             message: "Profile completed successfully",
-            data: user
+            data: {
+                userId: userId,   name,
+                email,
+                latitude,
+                longitude,
+                addresses,
+                phone: completeProfile.phone,
+                profileCompleted: true
+            }
         });
 
     } catch (error) {
