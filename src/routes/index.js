@@ -24,6 +24,7 @@ const deliveryChargeRoutes = require("./deliveryCharge.routes");
 const deliverySlotRoutes = require("./deliverySlot.routes");
 const addressRoutes = require("./address.routes");
 const orderRoutes = require("./order.routes");
+const promoCodeRoutes = require("./promoCode.routes");
 router.use("/auth",  authRoutes );
 router.use("/brands", brandRoutes);
 router.use("/categories", categoryRoutes);
@@ -37,6 +38,7 @@ router.use("/delivery-slots", deliverySlotRoutes);
 router.use("/addresses", addressRoutes);
 router.use("/orders", orderRoutes);
 router.use("/sections", require("./section.routes"));
+router.use("/promo-codes", promoCodeRoutes);
 
   
 module.exports = router;

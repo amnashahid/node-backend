@@ -16,44 +16,11 @@ const orderItemSchema = new mongoose.Schema(
       index: true,
     },
 
-    /*
-     * NULL:
-     *   Product was purchased individually.
-     *
-     * DEAL ID:
-     *   Product came from a deal.
-     *
-     * This allows the same product to appear twice:
-     *
-     * Juice A + dealId = deal123
-     * Juice A + dealId = null
-     */
     dealId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Deal",
       default: null,
       index: true,
-    },
-
-    // Product snapshot
-    productNameEn: {
-      type: String,
-      required: true,
-    },
-
-    productNameUr: {
-      type: String,
-      default: "",
-    },
-
-    sku: {
-      type: String,
-      default: "",
-    },
-
-    image: {
-      type: String,
-      default: "",
     },
 
     quantity: {

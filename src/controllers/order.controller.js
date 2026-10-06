@@ -1,13 +1,10 @@
-
 const mongoose = require("mongoose");
 
 const Order = require("../models/order.model");
 const OrderItem = require("../models/orderItem.model");
 const OrderTimeline = require("../models/orderTimeline.model");
-
 const Product = require("../models/product.model");
 const Deal = require("../models/deal.model");
-const Address = require("../models/address.model");
 const DeliverySlot = require("../models/deliverySlot.model");
 const User = require("../models/User");
 
@@ -15,30 +12,31 @@ const User = require("../models/User");
 // GENERATE ORDER NUMBER
 // ============================================================
 
-const generateOrderNumber = async () => {
-  const date = new Date();
+const generateOrderNumber = () => {
+  const timestamp = Date.now().toString();
 
-  const year = date.getFullYear();
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, "0");
+  const random = Math.floor(
+    1000 + Math.random() * 9000
+  );
 
-  const day = String(
-    date.getDate()
-  ).padStart(2, "0");
+  return `ORD-${timestamp}-${random}`;
+};
 
-  const prefix = `ORD-${year}${month}${day}`;
+// ============================================================
+// SAFE NUMBER
+// ============================================================
 
-  const count = await Order.countDocuments({
-    orderNumber: {
-      $regex: `^${prefix}`,
-    },
-  });
+const toSafeNumber = (
+  value,
+  defaultValue = 0
+) => {
+  const number = Number(value);
 
-  return `${prefix}-${String(count + 1).padStart(
-    4,
-    "0"
-  )}`;
+  if (!Number.isFinite(number)) {
+    return defaultValue;
+  }
+
+  return number;
 };
 
 // ============================================================
@@ -47,227 +45,359 @@ const generateOrderNumber = async () => {
 
 const createOrder = async (req, res, next) => {
   const session = await mongoose.startSession();
+
   try {
-    //const customerId = req.user.id;
     const {
+      customerId,
       addressId,
       deliverySlotId,
       items,
       paymentMethod,
       customerNotes,
-      customerId,
+      deliveryCharges,
     } = req.body;
 
-    // --------------------------------------------------------
+    // ========================================================
     // BASIC VALIDATION
-    // --------------------------------------------------------
+    // ========================================================
 
-    if (!addressId) {
+    if (
+      !customerId ||
+      !mongoose.Types.ObjectId.isValid(customerId)
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Address is required",
+        message: "Invalid customerId.",
       });
     }
 
-    if (!deliverySlotId) {
+    if (
+      !addressId ||
+      !mongoose.Types.ObjectId.isValid(addressId)
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Delivery slot is required",
+        message: "Invalid addressId.",
       });
     }
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (
+      !deliverySlotId ||
+      !mongoose.Types.ObjectId.isValid(
+        deliverySlotId
+      )
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Order must contain at least one item",
+        message: "Invalid deliverySlotId.",
       });
     }
 
-    // --------------------------------------------------------
-    // GET CUSTOMER ADDRESS
-    // --------------------------------------------------------
+    if (
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Order must contain at least one item.",
+      });
+    }
+
+    // ========================================================
+    // CUSTOMER
+    // ========================================================
 
     const customer = await User.findOne({
       _id: customerId,
       isActive: true,
-    }).lean();
+    });
 
-    const address = customer.addresses.find(
-      (addr) => addr._id.toString() === addressId
-    );
-
-    if (!address) {
+    if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Address not found",
+        message: "Customer not found or inactive.",
       });
     }
 
-    // --------------------------------------------------------
-    // GET DELIVERY SLOT
-    // --------------------------------------------------------
+    // ========================================================
+    // ADDRESS
+    // ========================================================
+
+    const selectedAddress =
+      customer.addresses?.find(
+        (address) =>
+          String(address._id) ===
+          String(addressId)
+      );
+
+    if (!selectedAddress) {
+      return res.status(404).json({
+        success: false,
+        message: "Selected address was not found.",
+      });
+    }
+
+    // ========================================================
+    // DELIVERY SLOT
+    // ========================================================
 
     const deliverySlot =
       await DeliverySlot.findOne({
         _id: deliverySlotId,
         isActive: true,
-      }).lean();
+      });
+
     if (!deliverySlot) {
       return res.status(404).json({
         success: false,
-        message: "Delivery slot not found",
+        message:
+          "Delivery slot not found or inactive.",
       });
     }
 
-    // --------------------------------------------------------
-    // CHECK DELIVERY SLOT DAY
-    // --------------------------------------------------------
+    // ========================================================
+    // DELIVERY CHARGES
+    // ========================================================
 
-    const deliveryDay =
-      deliverySlot.dayOfWeek;
-    if (
-      ![
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-      ].includes(deliveryDay)
-    ) {
+    const safeDeliveryCharges =
+      toSafeNumber(
+        deliveryCharges,
+        0
+      );
+
+    if (safeDeliveryCharges < 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid delivery slot day",
+        message:
+          "Delivery charges cannot be negative.",
       });
     }
 
-    // --------------------------------------------------------
-    // PROCESS ITEMS
-    // --------------------------------------------------------
-
-    const orderItems = [];
+    // ========================================================
+    // PREPARE ORDER ITEMS
+    // ========================================================
 
     let subtotal = 0;
     let discount = 0;
 
-        if (!name) {
+    const orderItemsData = [];
+
+    console.log(
+      "ORDER ITEMS RECEIVED:",
+      JSON.stringify(items, null, 2)
+    );
+
+    // ========================================================
+    // PROCESS EACH ITEM
+    // ========================================================
+
+    for (const requestedItem of items) {
+      if (!requestedItem) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid order item.",
+        });
+      }
+
       const {
         productId,
         quantity,
+        price,
         dealId,
       } = requestedItem;
 
       // ------------------------------------------------------
-      // VALIDATE PRODUCT
+      // PRODUCT ID
       // ------------------------------------------------------
 
-      if (!productId) {
-        throw new Error(
-          "Product ID is required"
-        );
+      if (
+        !productId ||
+        !mongoose.Types.ObjectId.isValid(
+          productId
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid productId: ${productId}`,
+        });
       }
+
+      // ------------------------------------------------------
+      // QUANTITY
+      // ------------------------------------------------------
 
       const itemQuantity =
         Number(quantity);
 
       if (
-        !Number.isInteger(itemQuantity) ||
-        itemQuantity <= 0
+        !Number.isFinite(itemQuantity) ||
+        itemQuantity < 1 ||
+        !Number.isInteger(itemQuantity)
       ) {
-        throw new Error(
-          `Invalid quantity for product ${productId}`
-        );
+        return res.status(400).json({
+          success: false,
+          message: `Invalid quantity for product ${productId}.`,
+        });
       }
+
+      // ------------------------------------------------------
+      // UNIT PRICE
+      // ------------------------------------------------------
+
+      const unitPrice =
+        Number(price);
+
+      // console.log(
+      //   `Product ${productId} received price:`,
+      //   price,
+      //   "converted:",
+      //   unitPrice
+      // );
+
+      // if (
+      //   !Number.isFinite(unitPrice) ||
+      //   unitPrice < 0
+      // ) {
+      //   return res.status(400).json({
+      //     success: false,
+      //     message:
+      //       `Invalid unit price for product ${productId}. ` +
+      //       `Received: ${price}`,
+      //   });
+      // }
+
+      // ------------------------------------------------------
+      // PRODUCT
+      // ------------------------------------------------------
 
       const product =
-        await Product.findById(productId).lean();
+        await Product.findOne({
+          _id: productId,
+          isActive: true,
+        });
 
       if (!product) {
-        throw new Error(
-          `Product not found: ${productId}`
-        );
-      }
-
-      // Optional product active check
-      if (product.isActive === false) {
-        throw new Error(
-          `${product.nameEn} is not available`
-        );
+        return res.status(404).json({
+          success: false,
+          message:
+            `Product ${productId} not found or inactive.`,
+        });
       }
 
       // ------------------------------------------------------
+      // ITEM TOTAL
+      // ------------------------------------------------------
+
+      const itemTotal =
+        unitPrice * itemQuantity;
+
+      if (
+        !Number.isFinite(itemTotal) ||
+        itemTotal < 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Unable to calculate total for product ${productId}.`,
+        });
+      }
+
+      // ======================================================
       // NORMAL PRODUCT
-      // ------------------------------------------------------
+      // ======================================================
 
       if (!dealId) {
-        const unitPrice =
-          Number(product.price || 0);
+        const regularPrice =
+          toSafeNumber(
+            product.price,
+            unitPrice
+          );
 
-        const totalPrice =
-          unitPrice * itemQuantity;
+        // Calculate discount from the actual
+        // price being charged.
+        if (
+          regularPrice > unitPrice
+        ) {
+          discount +=
+            (regularPrice - unitPrice) *
+            itemQuantity;
+        }
 
-        subtotal += totalPrice;
-
-        orderItems.push({
-          productId: product._id,
+        orderItemsData.push({
+          productId:
+            product._id,
 
           dealId: null,
 
-          productNameEn:
-            product.nameEn,
-
-          productNameUr:
-            product.nameUr || "",
-
-          sku:
-            product.sku || "",
-
-          image:
-            product.image || "",
-
-          quantity: itemQuantity,
+          quantity:
+            itemQuantity,
 
           unitPrice,
 
-          totalPrice,
+          totalPrice:
+            itemTotal,
 
           dealPrice: null,
         });
 
+        subtotal += itemTotal;
+
+        continue;
       }
 
-      // ------------------------------------------------------
-      // DEAL PRODUCT
-      // ------------------------------------------------------
+      // ======================================================
+      // DEAL VALIDATION
+      // ======================================================
+
+      if (
+        !mongoose.Types.ObjectId.isValid(
+          dealId
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Invalid dealId: ${dealId}`,
+        });
+      }
 
       const deal =
         await Deal.findOne({
           _id: dealId,
           isActive: true,
-        }).lean();
+        });
 
       if (!deal) {
-        throw new Error(
-          `Deal not found or inactive: ${dealId}`
-        );
+        return res.status(404).json({
+          success: false,
+          message:
+            `Deal ${dealId} not found or inactive.`,
+        });
       }
 
       // ------------------------------------------------------
-      // CHECK PRODUCT IS ACTUALLY PART OF DEAL
+      // FIND PRODUCT INSIDE DEAL
       // ------------------------------------------------------
 
-      const dealProduct =
-        deal.products.find(
-          (dealItem) =>
-            dealItem.productId.toString() ===
-            productId.toString()
-        );
+      let dealProduct = null;
+
+      if (Array.isArray(deal.products)) {
+        dealProduct =
+          deal.products.find(
+            (dealItem) =>
+              String(
+                dealItem.productId
+              ) ===
+              String(product._id)
+          );
+      }
 
       if (!dealProduct) {
-        throw new Error(
-          `${product.nameEn} is not part of this deal`
-        );
+        return res.status(400).json({
+          success: false,
+          message:
+            `Product ${productId} does not belong to deal ${dealId}.`,
+        });
       }
 
       // ------------------------------------------------------
@@ -275,309 +405,383 @@ const createOrder = async (req, res, next) => {
       // ------------------------------------------------------
 
       const dealPrice =
-        Number(dealProduct.dealPrice);
+        toSafeNumber(
+          dealProduct.dealPrice ??
+            dealProduct.price ??
+            unitPrice,
+          unitPrice
+        );
 
       if (
-        Number.isNaN(dealPrice) ||
+        !Number.isFinite(dealPrice) ||
         dealPrice < 0
       ) {
-        throw new Error(
-          `Invalid deal price for ${product.nameEn}`
-        );
+        return res.status(400).json({
+          success: false,
+          message:
+            `Invalid deal price for product ${productId}.`,
+        });
       }
 
-      const totalPrice =
-        dealPrice * itemQuantity;
+      // ------------------------------------------------------
+      // DEAL DISCOUNT
+      // ------------------------------------------------------
 
-      const normalPrice =
-        Number(product.price || 0) *
-        itemQuantity;
-
-      const itemDiscount =
-        Math.max(
-          0,
-          normalPrice - totalPrice
+      const regularPrice =
+        toSafeNumber(
+          product.price,
+          unitPrice
         );
 
-      subtotal += totalPrice;
-      discount += itemDiscount;
+      if (
+        regularPrice > unitPrice
+      ) {
+        discount +=
+          (regularPrice - unitPrice) *
+          itemQuantity;
+      }
 
-      orderItems.push({
-        productId: product._id,
+      // ------------------------------------------------------
+      // ADD DEAL ITEM
+      // ------------------------------------------------------
 
-        // VERY IMPORTANT
-        dealId: deal._id,
+      orderItemsData.push({
+        productId:
+          product._id,
 
-        productNameEn:
-          product.nameEn,
+        dealId:
+          deal._id,
 
-        productNameUr:
-          product.nameUr || "",
+        quantity:
+          itemQuantity,
 
-        sku:
-          product.sku || "",
+        unitPrice,
 
-        image:
-          product.image || "",
-
-        quantity: itemQuantity,
-
-        unitPrice: dealPrice,
-
-        totalPrice,
+        totalPrice:
+          itemTotal,
 
         dealPrice,
       });
+
+      subtotal += itemTotal;
     }
 
-    // --------------------------------------------------------
-    // DELIVERY CHARGES
-    // --------------------------------------------------------
+    // ========================================================
+    // NORMALIZE SUBTOTAL
+    // ========================================================
 
-    // Change this later if you have delivery-charge logic.
-    const deliveryCharges = 0;
+    subtotal = Number(
+      subtotal.toFixed(2)
+    );
 
-    // --------------------------------------------------------
-    // TOTAL
-    // --------------------------------------------------------
+    discount = Number(
+      discount.toFixed(2)
+    );
 
-    const total =
-      subtotal +
-      deliveryCharges;
+    // ========================================================
+    // FINAL TOTAL
+    // ========================================================
 
-    // --------------------------------------------------------
-    // ORDER NUMBER
-    // --------------------------------------------------------
+    const calculatedTotal =
+      subtotal -
+      discount +
+      safeDeliveryCharges;
+
+    const total = Number(
+      Math.max(
+        calculatedTotal,
+        0
+      ).toFixed(2)
+    );
+
+    // ========================================================
+    // FINAL NUMBER VALIDATION
+    // ========================================================
+
+    if (
+      !Number.isFinite(subtotal)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid subtotal calculation.",
+      });
+    }
+
+    if (
+      !Number.isFinite(discount)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid discount calculation.",
+      });
+    }
+
+    if (
+      !Number.isFinite(
+        safeDeliveryCharges
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid delivery charges.",
+      });
+    }
+
+    if (
+      !Number.isFinite(total)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid total calculation.",
+      });
+    }
+
+    // ========================================================
+    // START TRANSACTION
+    // ========================================================
+
+    session.startTransaction();
+
+    // ========================================================
+    // CREATE ORDER
+    // ========================================================
 
     const orderNumber =
-      await generateOrderNumber();
+      generateOrderNumber();
 
-    // --------------------------------------------------------
-    // ADDRESS SNAPSHOT
-    // --------------------------------------------------------
-    console.log("address:", address);
-    console.log("customer:", customer);
-    const addressSnapshot = {
-      label:
-        address.label || "",
+    const order =
+      new Order({
+        orderNumber,
 
-      recipientName:
-        customer.firstName+ " " + customer.lastName || "",
+        customerId,
 
-      phone:
-        customer.phone,
-        
-      addressLine1:
-        address.address,
+        addressId,
 
-    deliveryInstructions:
-      address.deliveryInstructions || "",
-    //   addressLine2:
-    //     address.addressLine2 || "",
+        // Address snapshot
+        address: {
+          label:
+            selectedAddress.label ||
+            "",
 
-    //   area:
-    //     address.area || "",
+          recipientName:
+            selectedAddress.recipientName,
 
-    //   city:
-    //     address.city || "",
+          phone:
+            selectedAddress.phone,
 
-    //   postalCode:
-    //     address.postalCode || "",
+          addressLine1:
+            selectedAddress.addressLine1,
 
-      location:
-        address.location || "",
+          addressLine2:
+            selectedAddress.addressLine2 ||
+            "",
 
-      latitude:
-        address.latitude ?? null,
+          area:
+            selectedAddress.area ||
+            "",
 
-      longitude:
-        address.longitude ?? null,
-    };
-    console.log("addressSnapshot:", addressSnapshot);
+          city:
+            selectedAddress.city ||
+            "",
 
-    // --------------------------------------------------------
-    // DELIVERY SLOT SNAPSHOT
-    // --------------------------------------------------------
+          postalCode:
+            selectedAddress.postalCode ||
+            "",
 
-    const deliverySlotSnapshot = {
-      startTime:
-        deliverySlot.startTime,
+          location:
+            selectedAddress.location ||
+            "",
 
-      endTime:
-        deliverySlot.endTime,
-    };
+          latitude:
+            selectedAddress.latitude ??
+            null,
 
-    // --------------------------------------------------------
-    // CREATE EVERYTHING IN TRANSACTION
-    // --------------------------------------------------------
+          longitude:
+            selectedAddress.longitude ??
+            null,
+        },
 
-    let createdOrder;
+        // Delivery
+        deliveryDay:
+          deliverySlot.dayOfWeek,
 
-    await session.withTransaction(
-      async () => {
-        // ----------------------------------------------
-        // CREATE ORDER
-        // ----------------------------------------------
+        deliverySlotId:
+          deliverySlot._id,
 
-        const orders =
-          await Order.create(
-            [
-              {
-                orderNumber,
+        deliverySlot: {
+          startTime:
+            deliverySlot.startTime,
 
-                customerId,
+          endTime:
+            deliverySlot.endTime,
+        },
 
-                addressId,
+        status: "Pending",
 
-                address:
-                  addressSnapshot,
+        paymentMethod:
+          paymentMethod ||
+          "Cash on Delivery",
 
-                deliveryDay,
+        paymentStatus: "Pending",
 
-                deliverySlotId,
+        subtotal,
 
-                deliverySlot:
-                  deliverySlotSnapshot,
+        discount,
 
-                status: "Pending",
+        deliveryCharges:
+          safeDeliveryCharges,
 
-                paymentMethod:
-                  paymentMethod ||
-                  "Cash on Delivery",
+        total,
 
-                paymentStatus:
-                  "Pending",
+        customerNotes:
+          customerNotes || "",
 
-                subtotal,
+        cancellationReason: "",
+      });
 
-                discount,
+    await order.save({
+      session,
+    });
 
-                deliveryCharges,
+    // ========================================================
+    // CREATE ORDER ITEMS
+    // ========================================================
 
-                total,
+    const orderItems =
+      orderItemsData.map(
+        (item) => ({
+          orderId:
+            order._id,
 
-                customerNotes:
-                  customerNotes || "",
-              },
-            ],
-            {
-              session,
-            }
-          );
+          productId:
+            item.productId,
 
-        createdOrder = orders[0];
+          dealId:
+            item.dealId,
 
-        // ----------------------------------------------
-        // CREATE ORDER ITEMS
-        // ----------------------------------------------
+          quantity:
+            item.quantity,
 
-        const itemsToCreate =
-          orderItems.map((item) => ({
-            ...item,
+          unitPrice:
+            item.unitPrice,
 
-            orderId:
-              createdOrder._id,
-          }));
+          totalPrice:
+            item.totalPrice,
 
-        await OrderItem.insertMany(
-          itemsToCreate,
-          {
-            session,
-          }
-        );
+          dealPrice:
+            item.dealPrice,
+        })
+      );
 
-        // ----------------------------------------------
-        // CREATE INITIAL TIMELINE
-        // ----------------------------------------------
-
-        await OrderTimeline.create(
-          [
-            {
-              orderId:
-                createdOrder._id,
-
-              status: "Pending",
-
-              title:
-                "Order placed",
-
-              message:
-                "Your order has been placed successfully.",
-
-              changedBy:
-                customerId,
-
-              changedByType:
-                "customer",
-            },
-          ],
-          {
-            session,
-          }
-        );
+    await OrderItem.insertMany(
+      orderItems,
+      {
+        session,
       }
     );
 
-    // --------------------------------------------------------
-    // RETURN COMPLETE ORDER
-    // --------------------------------------------------------
+    // ========================================================
+    // CREATE INITIAL TIMELINE
+    // ========================================================
 
-    const completeOrder =
+    await OrderTimeline.create(
+      [
+        {
+          orderId:
+            order._id,
+
+          status: "Pending",
+
+          note:
+            "Order placed successfully.",
+        },
+      ],
+      {
+        session,
+      }
+    );
+
+    // ========================================================
+    // COMMIT
+    // ========================================================
+
+    await session.commitTransaction();
+
+    // ========================================================
+    // FETCH COMPLETE ORDER
+    // ========================================================
+
+    const createdOrder =
       await Order.findById(
-        createdOrder._id
+        order._id
       )
         .populate(
           "customerId",
-          "name phone email"
+          "name email phone"
         )
         .populate(
-          "addressId"
+          "deliverySlotId"
         )
         .lean();
 
-    const completeItems =
+    const createdOrderItems =
       await OrderItem.find({
         orderId:
-          createdOrder._id,
+          order._id,
       })
         .populate(
           "productId"
         )
         .populate(
-          "dealId",
-          "nameEn nameUr"
+          "dealId"
         )
         .lean();
 
     const timeline =
       await OrderTimeline.find({
         orderId:
-          createdOrder._id,
+          order._id,
       })
         .sort({
           createdAt: 1,
         })
         .lean();
 
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
     return res.status(201).json({
       success: true,
-
       message:
-        "Order created successfully",
-
+        "Order created successfully.",
       data: {
         order:
-          completeOrder,
+          createdOrder,
 
         items:
-          completeItems,
+          createdOrderItems,
 
         timeline,
       },
     });
   } catch (error) {
+    // ========================================================
+    // ABORT TRANSACTION
+    // ========================================================
+
+    if (
+      session.inTransaction()
+    ) {
+      await session.abortTransaction();
+    }
+
     console.error(
-      "Create order error:",
+      "CREATE ORDER ERROR:",
       error
     );
 
@@ -597,20 +801,91 @@ const getMyOrders = async (
   next
 ) => {
   try {
-    const customerId = req.user.id;
+    const {
+      customerId,
+    } = req.params;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        customerId
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid customerId.",
+      });
+    }
 
     const orders =
       await Order.find({
         customerId,
       })
+        .populate(
+          "deliverySlotId"
+        )
         .sort({
           createdAt: -1,
         })
         .lean();
 
+    const orderIds =
+      orders.map(
+        (order) => order._id
+      );
+
+    const orderItems =
+      await OrderItem.find({
+        orderId: {
+          $in: orderIds,
+        },
+      })
+        .populate(
+          "productId"
+        )
+        .populate(
+          "dealId"
+        )
+        .lean();
+
+    const timelines =
+      await OrderTimeline.find({
+        orderId: {
+          $in: orderIds,
+        },
+      })
+        .sort({
+          createdAt: 1,
+        })
+        .lean();
+
+    const data =
+      orders.map((order) => ({
+        ...order,
+
+        items:
+          orderItems.filter(
+            (item) =>
+              String(
+                item.orderId
+              ) ===
+              String(order._id)
+          ),
+
+        timeline:
+          timelines.filter(
+            (timeline) =>
+              String(
+                timeline.orderId
+              ) ===
+              String(order._id)
+          ),
+      }));
+
     return res.status(200).json({
       success: true,
-      data: orders,
+      count: data.length,
+      data,
     });
   } catch (error) {
     next(error);
@@ -627,48 +902,74 @@ const getMyOrderById = async (
   next
 ) => {
   try {
-    const customerId = req.user.id;
+    const {
+      customerId,
+      orderId,
+    } = req.params;
 
-    const { id } =
-      req.params;
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        customerId
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid customerId.",
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        orderId
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid orderId.",
+      });
+    }
 
     const order =
       await Order.findOne({
-        _id: id,
+        _id: orderId,
         customerId,
       })
         .populate(
           "customerId",
-          "name phone email"
+          "name email phone"
         )
         .populate(
-          "addressId"
+          "deliverySlotId"
         )
         .lean();
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found",
+        message:
+          "Order not found.",
       });
     }
 
     const items =
       await OrderItem.find({
-        orderId: order._id,
+        orderId:
+          order._id,
       })
         .populate(
           "productId"
         )
         .populate(
-          "dealId",
-          "nameEn nameUr"
+          "dealId"
         )
         .lean();
 
     const timeline =
       await OrderTimeline.find({
-        orderId: order._id,
+        orderId:
+          order._id,
       })
         .sort({
           createdAt: 1,
@@ -677,7 +978,6 @@ const getMyOrderById = async (
 
     return res.status(200).json({
       success: true,
-
       data: {
         order,
         items,
@@ -690,7 +990,7 @@ const getMyOrderById = async (
 };
 
 // ============================================================
-// GET ALL ORDERS - ADMIN
+// GET ALL ORDERS
 // ============================================================
 
 const getAllOrders = async (
@@ -699,59 +999,77 @@ const getAllOrders = async (
   next
 ) => {
   try {
-    const {
-      status,
-      customerId,
-      page = 1,
-      limit = 20,
-    } = req.query;
-
-    const filter = {};
-
-    if (status) {
-      filter.status = status;
-    }
-
-    if (customerId) {
-      filter.customerId =
-        customerId;
-    }
-
-    const skip =
-      (Number(page) - 1) *
-      Number(limit);
-
     const orders =
-      await Order.find(filter)
+      await Order.find()
         .populate(
           "customerId",
-          "name phone email"
+          "name email phone"
+        )
+        .populate(
+          "deliverySlotId"
         )
         .sort({
           createdAt: -1,
         })
-        .skip(skip)
-        .limit(Number(limit))
         .lean();
 
-    const total =
-      await Order.countDocuments(
-        filter
+    const orderIds =
+      orders.map(
+        (order) => order._id
       );
+
+    const items =
+      await OrderItem.find({
+        orderId: {
+          $in: orderIds,
+        },
+      })
+        .populate(
+          "productId"
+        )
+        .populate(
+          "dealId"
+        )
+        .lean();
+
+    const timelines =
+      await OrderTimeline.find({
+        orderId: {
+          $in: orderIds,
+        },
+      })
+        .sort({
+          createdAt: 1,
+        })
+        .lean();
+
+    const data =
+      orders.map((order) => ({
+        ...order,
+
+        items:
+          items.filter(
+            (item) =>
+              String(
+                item.orderId
+              ) ===
+              String(order._id)
+          ),
+
+        timeline:
+          timelines.filter(
+            (timeline) =>
+              String(
+                timeline.orderId
+              ) ===
+              String(order._id)
+          ),
+      }));
 
     return res.status(200).json({
       success: true,
-
-      data: orders,
-
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        pages: Math.ceil(
-          total / Number(limit)
-        ),
-      },
+      count: data.length,
+      data,
     });
   } catch (error) {
     next(error);
@@ -759,7 +1077,7 @@ const getAllOrders = async (
 };
 
 // ============================================================
-// GET ADMIN ORDER DETAIL
+// GET ORDER BY ID
 // ============================================================
 
 const getOrderById = async (
@@ -768,17 +1086,29 @@ const getOrderById = async (
   next
 ) => {
   try {
-    const { id } =
-      req.params;
+    const {
+      orderId,
+    } = req.params;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        orderId
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid orderId.",
+      });
+    }
 
     const order =
-      await Order.findById(id)
+      await Order.findById(
+        orderId
+      )
         .populate(
           "customerId",
-          "name phone email"
-        )
-        .populate(
-          "addressId"
+          "name email phone"
         )
         .populate(
           "deliverySlotId"
@@ -788,31 +1118,29 @@ const getOrderById = async (
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found",
+        message:
+          "Order not found.",
       });
     }
 
     const items =
       await OrderItem.find({
-        orderId: id,
+        orderId:
+          order._id,
       })
         .populate(
           "productId"
         )
         .populate(
-          "dealId",
-          "nameEn nameUr"
+          "dealId"
         )
         .lean();
 
     const timeline =
       await OrderTimeline.find({
-        orderId: id,
+        orderId:
+          order._id,
       })
-        .populate(
-          "changedBy",
-          "name phone role"
-        )
         .sort({
           createdAt: 1,
         })
@@ -820,7 +1148,6 @@ const getOrderById = async (
 
     return res.status(200).json({
       success: true,
-
       data: {
         order,
         items,
@@ -845,16 +1172,16 @@ const updateOrderStatus = async (
     await mongoose.startSession();
 
   try {
-    const { id } =
-      req.params;
+    const {
+      orderId,
+    } = req.params;
 
     const {
       status,
-      message,
-      cancellationReason,
+      note,
     } = req.body;
 
-    const validStatuses = [
+    const allowedStatuses = [
       "Pending",
       "Confirmed",
       "Preparing",
@@ -863,141 +1190,95 @@ const updateOrderStatus = async (
       "Delivered",
       "Cancelled",
     ];
+
     if (
-      !validStatuses.includes(status)
+      !mongoose.Types.ObjectId.isValid(
+        orderId
+      )
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid order status",
+        message:
+          "Invalid orderId.",
       });
     }
 
-    let updatedOrder;
+    if (
+      !allowedStatuses.includes(
+        status
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid order status.",
+      });
+    }
 
-    await session.withTransaction(
-      async () => {
-        const order =
-          await Order.findById(id)
-            .session(session);
+    session.startTransaction();
 
-        if (!order) {
-          throw new Error(
-            "Order not found"
-          );
-        }
+    const order =
+      await Order.findById(
+        orderId
+      ).session(session);
 
-        const oldStatus =
-          order.status;
+    if (!order) {
+      await session.abortTransaction();
 
-        // Don't create duplicate
-        // timeline entry
-        if (
-          oldStatus === status
-        ) {
-          throw new Error(
-            `Order is already ${status}`
-          );
-        }
+      return res.status(404).json({
+        success: false,
+        message:
+          "Order not found.",
+      });
+    }
 
-        order.status =
-          status;
+    order.status = status;
 
-        if (
-          status === "Cancelled"
-        ) {
-          order.cancellationReason =
-            cancellationReason ||
-            "";
-        }
+    if (status === "Cancelled") {
+      order.cancellationReason =
+        note || "";
+    }
 
-        await order.save({
-          session,
-        });
+    await order.save({
+      session,
+    });
 
-        const title =
-          getTimelineTitle(
-            status
-          );
+    await OrderTimeline.create(
+      [
+        {
+          orderId:
+            order._id,
 
-        await OrderTimeline.create(
-          [
-            {
-              orderId:
-                order._id,
+          status,
 
-              status,
-
-              title,
-
-              message:
-                message || "",
-
-              changedBy:
-                req.user.id,
-
-              changedByType:
-                req.user.role ===
-                "admin"
-                  ? "admin"
-                  : "customer",
-            },
-          ],
-          {
-            session,
-          }
-        );
-
-        updatedOrder =
-          order;
+          note:
+            note ||
+            `Order status changed to ${status}.`,
+        },
+      ],
+      {
+        session,
       }
     );
 
+    await session.commitTransaction();
+
     return res.status(200).json({
       success: true,
-
       message:
-        "Order status updated successfully",
-
-      data: updatedOrder,
+        "Order status updated successfully.",
+      data: order,
     });
   } catch (error) {
+    if (
+      session.inTransaction()
+    ) {
+      await session.abortTransaction();
+    }
+
     next(error);
   } finally {
     await session.endSession();
-  }
-};
-
-// ============================================================
-// TIMELINE TITLES
-// ============================================================
-
-const getTimelineTitle = (
-  status
-) => {
-  switch (status) {
-    case "Pending":
-      return "Order placed";
-
-    case "Confirmed":
-      return "Order confirmed";
-
-    case "Preparing":
-      return "Order is being prepared";
-
-    case "Ready":
-      return "Order is ready";
-
-    case "Out for Delivery":
-      return "Out for Delivery";
-
-    case "Delivered":
-      return "Order delivered";
-
-    case "Cancelled":
-      return "Order cancelled";
-
-    default:
-      return "Order status updated";
   }
 };
 
@@ -1011,24 +1292,45 @@ const getOrderTimeline = async (
   next
 ) => {
   try {
-    const { id } =
-      req.params;
+    const {
+      orderId,
+    } = req.params;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        orderId
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid orderId.",
+      });
+    }
+
+    const order =
+      await Order.findById(
+        orderId
+      );
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Order not found.",
+      });
+    }
 
     const timeline =
       await OrderTimeline.find({
-        orderId: id,
-      })
-        .populate(
-          "changedBy",
-          "firstName lastName role"
-        )
-        .sort({
-          createdAt: 1,
-        })
-        .lean();
+        orderId,
+      }).sort({
+        createdAt: 1,
+      });
 
     return res.status(200).json({
       success: true,
+      count: timeline.length,
       data: timeline,
     });
   } catch (error) {
@@ -1036,87 +1338,106 @@ const getOrderTimeline = async (
   }
 };
 
-
 // ============================================================
-// DELETE ORDER - ADMIN
+// DELETE ORDER
 // ============================================================
 
-const deleteOrder = async (req, res, next) => {
-  const session = await mongoose.startSession();
+const deleteOrder = async (
+  req,
+  res,
+  next
+) => {
+  const session =
+    await mongoose.startSession();
 
   try {
-    const { id } = req.params;
+    const {
+      orderId,
+    } = req.params;
 
-    let deletedOrder;
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        orderId
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid orderId.",
+      });
+    }
 
-    await session.withTransaction(async () => {
-      // --------------------------------------------------------
-      // FIND ORDER
-      // --------------------------------------------------------
+    session.startTransaction();
 
-      const order = await Order.findById(id).session(session);
+    const order =
+      await Order.findById(
+        orderId
+      ).session(session);
 
-      if (!order) {
-        throw new Error("Order not found");
+    if (!order) {
+      await session.abortTransaction();
+
+      return res.status(404).json({
+        success: false,
+        message:
+          "Order not found.",
+      });
+    }
+
+    await OrderItem.deleteMany(
+      {
+        orderId:
+          order._id,
+      },
+      {
+        session,
       }
+    );
 
-      // --------------------------------------------------------
-      // DELETE ORDER TIMELINE
-      // --------------------------------------------------------
+    await OrderTimeline.deleteMany(
+      {
+        orderId:
+          order._id,
+      },
+      {
+        session,
+      }
+    );
 
-      await OrderTimeline.deleteMany(
-        {
-          orderId: order._id,
-        },
-        {
-          session,
-        }
-      );
+    await Order.deleteOne(
+      {
+        _id:
+          order._id,
+      },
+      {
+        session,
+      }
+    );
 
-      // --------------------------------------------------------
-      // DELETE ORDER ITEMS
-      // --------------------------------------------------------
-
-      await OrderItem.deleteMany(
-        {
-          orderId: order._id,
-        },
-        {
-          session,
-        }
-      );
-
-      // --------------------------------------------------------
-      // DELETE ORDER
-      // --------------------------------------------------------
-
-      await Order.deleteOne(
-        {
-          _id: order._id,
-        },
-        {
-          session,
-        }
-      );
-
-      deletedOrder = order;
-    });
+    await session.commitTransaction();
 
     return res.status(200).json({
       success: true,
-      message: "Order deleted successfully",
-      data: {
-        orderId: deletedOrder._id,
-        orderNumber: deletedOrder.orderNumber,
-      },
+      message:
+        "Order deleted successfully.",
     });
   } catch (error) {
-    console.error("Delete order error:", error);
+    if (
+      session.inTransaction()
+    ) {
+      await session.abortTransaction();
+    }
+
     next(error);
   } finally {
     await session.endSession();
   }
 };
+
+// ============================================================
+// EXPORTS
+// ============================================================
+
 module.exports = {
   createOrder,
   getMyOrders,
