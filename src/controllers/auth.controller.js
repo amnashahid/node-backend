@@ -142,7 +142,6 @@ const completeProfile = async (req, res, next) => {
 const id = req.user._id;
         const {
             name,
-            email,
             latitude,
             longitude,
             addresses,
@@ -166,26 +165,41 @@ const id = req.user._id;
             { _id: userId },
             {
                 name,
-                email,
                 latitude,
                 longitude,
                 addresses,
                 profileCompleted: true
             }
         );
-
+        const updatedProfile = await  User.findOne({
+                _id: req.user._id
+                });
+        
 
         return res.status(200).json({
             success: true,
             message: "Profile completed successfully",
-            data: {
-                userId: userId,   name,
-                email,
-                latitude,
-                longitude,
-                addresses,
-                phone: completeProfile.phone,
-                profileCompleted: true
+            data: {...updatedProfile,
+                userId: userId,
+                name: updatedProfile.name,
+                latitude: updatedProfile.latitude,
+                longitude: updatedProfile.longitude,
+                phone: updatedProfile.phone,
+                profileCompleted: true,
+                profileCompleted: updatedProfile.profileCompleted,
+                addresses : updatedProfile.addresses.map(address => 
+                {
+                    return {
+                        addressId: address._id,
+                    address: address.adddress,
+                    latitude: address.latitude,
+                    longitude: address.longitude,
+                    isDefault: address.isDefault,
+                    label: address.label,
+                    
+                        
+                    }
+                })
             }
         });
 

@@ -55,7 +55,7 @@ router.get(
 
 // Get order details
 router.get(
-  "/:id",
+  "/:orderId",
   authMiddleware,
   roleMiddleware("admin"),
   getOrderById

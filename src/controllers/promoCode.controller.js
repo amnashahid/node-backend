@@ -131,6 +131,7 @@ const createPromoCode = async (req, res, next) => {
       });
     }
 
+  console.log("Creating promo code", req.body);
     code = code.trim().toUpperCase();
 
     // Check duplicate
@@ -165,6 +166,19 @@ const createPromoCode = async (req, res, next) => {
           "Percentage discount cannot be greater than 100",
       });
     }
+
+    console.log("Creating promo code with values:", { 
+      code,
+      description,
+      discountType,
+      discountValue,
+      maxDiscount,
+      minOrderAmount,
+      usageLimit,
+      startDate,
+      expiryDate,
+      isActive,
+    });
 
     const promoCode = await PromoCode.create({
       code,
@@ -203,6 +217,7 @@ const createPromoCode = async (req, res, next) => {
       data: promoCode,
     });
   } catch (error) {
+    console.log(error)
     next(error);
   }
 };

@@ -50,6 +50,8 @@ const createOrder = async (req, res, next) => {
     const {
       customerId,
       addressId,
+      phone,
+      name,
       deliverySlotId,
       items,
       paymentMethod,
@@ -247,24 +249,18 @@ const createOrder = async (req, res, next) => {
       const unitPrice =
         Number(price);
 
-      // console.log(
-      //   `Product ${productId} received price:`,
-      //   price,
-      //   "converted:",
-      //   unitPrice
-      // );
 
-      // if (
-      //   !Number.isFinite(unitPrice) ||
-      //   unitPrice < 0
-      // ) {
-      //   return res.status(400).json({
-      //     success: false,
-      //     message:
-      //       `Invalid unit price for product ${productId}. ` +
-      //       `Received: ${price}`,
-      //   });
-      // }
+      if (
+        !Number.isFinite(unitPrice) ||
+        unitPrice < 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Invalid unit price for product ${productId}. ` +
+            `Received: ${price}`,
+        });
+      }
 
       // ------------------------------------------------------
       // PRODUCT
@@ -567,18 +563,14 @@ const createOrder = async (req, res, next) => {
             selectedAddress.label ||
             "",
 
-          recipientName:
-            selectedAddress.recipientName,
+          recipientName: name,
+            //selectedAddress.recipientName,
 
-          phone:
-            selectedAddress.phone,
+          phone: phone,
 
           addressLine1:
-            selectedAddress.addressLine1,
+            selectedAddress.address,
 
-          addressLine2:
-            selectedAddress.addressLine2 ||
-            "",
 
           area:
             selectedAddress.area ||

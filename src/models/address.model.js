@@ -24,7 +24,6 @@ const addressSchema = new mongoose.Schema(
     phone: {
       type: String,
       trim: true,
-      required: true,
     },
 
     addressLine1: {

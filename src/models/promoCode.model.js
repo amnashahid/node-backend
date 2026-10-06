@@ -97,7 +97,6 @@ promoCodeSchema.pre("validate", function (next) {
     );
   }
 
-  next();
 });
 
 module.exports = mongoose.model("PromoCode", promoCodeSchema);
