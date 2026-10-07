@@ -62,8 +62,8 @@ router.get(
 );
 
 // Update order status
-router.patch(
-  "/:id/status",
+router.put(
+  "/:orderId/status",
   authMiddleware,
   roleMiddleware("admin"),
   updateOrderStatus
@@ -71,7 +71,7 @@ router.patch(
 
 // Get timeline
 router.get(
-  "/:id/timeline",
+  "/:orderId/timeline",
   authMiddleware,
   roleMiddleware("admin"),
   getOrderTimeline

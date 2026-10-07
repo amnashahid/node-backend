@@ -995,7 +995,7 @@ const getAllOrders = async (
       await Order.find()
         .populate(
           "customerId",
-          "name email phone"
+          "name  phone"
         )
         .populate(
           "deliverySlotId"
