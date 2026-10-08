@@ -23,6 +23,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/react": "^19.3.0",
     "nodemon": "^3.1.14"
   }
 }

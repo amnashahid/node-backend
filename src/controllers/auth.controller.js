@@ -142,6 +142,8 @@ const completeProfile = async (req, res, next) => {
 const id = req.user._id;
         const {
             name,
+            email,
+            location,
             latitude,
             longitude,
             addresses,
@@ -162,23 +164,21 @@ const id = req.user._id;
         });
 
         await User.updateOne(
-            { _id: userId },
-            {
                 name,
+                firstName,
+                lastName,
+                email,
+                location,
                 latitude,
-                longitude,
-                addresses,
-                profileCompleted: true
-            }
         );
         const updatedProfile = await  User.findOne({
                 _id: req.user._id
                 });
         
-
-        return res.status(200).json({
-            success: true,
-            message: "Profile completed successfully",
+                addresses,
+                profileCompleted: true
+            }
+        ).select("-__v");
             data: {...updatedProfile,
                 userId: userId,
                 name: updatedProfile.name,
@@ -201,6 +201,10 @@ const id = req.user._id;
                     }
                 })
             }
+        return res.status(200).json({
+            success: true,
+            message: "Profile completed successfully",
+            data: user
         });
 
     } catch (error) {
