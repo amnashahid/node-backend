@@ -164,29 +164,28 @@ const id = req.user._id;
         });
 
         await User.updateOne(
+            {
+                _id: req.user._id
+            },
+            {
                 name,
-                firstName,
-                lastName,
                 email,
                 location,
                 latitude,
+                longitude,
+                addresses
+            }
         );
         const updatedProfile = await  User.findOne({
                 _id: req.user._id
-                });
-        
-                addresses,
-                profileCompleted: true
-            }
-        ).select("-__v");
-            data: {...updatedProfile,
+        }).select("-__v");
+           var user = {
                 userId: userId,
                 name: updatedProfile.name,
                 latitude: updatedProfile.latitude,
                 longitude: updatedProfile.longitude,
                 phone: updatedProfile.phone,
                 profileCompleted: true,
-                profileCompleted: updatedProfile.profileCompleted,
                 addresses : updatedProfile.addresses.map(address => 
                 {
                     return {

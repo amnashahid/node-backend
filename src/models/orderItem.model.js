@@ -29,6 +29,12 @@ const orderItemSchema = new mongoose.Schema(
       min: 1,
     },
 
+    totalPrice: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
     // Price per unit at time of order
     unitPrice: {
       type: Number,

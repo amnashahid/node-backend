@@ -54,10 +54,15 @@ const createOrder = async (req, res, next) => {
       name,
       deliverySlotId,
       items,
+      total,
+      subTotal,
+      discount,
       paymentMethod,
       customerNotes,
       deliveryCharges,
     } = req.body;
+
+    console.log(req.body)
 
     // ========================================================
     // BASIC VALIDATION
@@ -175,334 +180,322 @@ const createOrder = async (req, res, next) => {
       });
     }
 
-    // ========================================================
-    // PREPARE ORDER ITEMS
-    // ========================================================
+    
 
-    let subtotal = 0;
-    let discount = 0;
+    // // ========================================================
+    // // PROCESS EACH ITEM
+    // // ========================================================
 
-    const orderItemsData = [];
+    // for (const requestedItem of items) {
+    //   if (!requestedItem) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: "Invalid order item.",
+    //     });
+    //   }
 
-    console.log(
-      "ORDER ITEMS RECEIVED:",
-      JSON.stringify(items, null, 2)
-    );
+    //   const {
+    //     productId,
+    //     quantity,
+    //     price,
+    //     dealId,
+    //   } = requestedItem;
 
-    // ========================================================
-    // PROCESS EACH ITEM
-    // ========================================================
+    //   // ------------------------------------------------------
+    //   // PRODUCT ID
+    //   // ------------------------------------------------------
 
-    for (const requestedItem of items) {
-      if (!requestedItem) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid order item.",
-        });
-      }
+    //   if (
+    //     !productId ||
+    //     !mongoose.Types.ObjectId.isValid(
+    //       productId
+    //     )
+    //   ) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: `Invalid productId: ${productId}`,
+    //     });
+    //   }
 
-      const {
-        productId,
-        quantity,
-        price,
-        dealId,
-      } = requestedItem;
+    //   // ------------------------------------------------------
+    //   // QUANTITY
+    //   // ------------------------------------------------------
 
-      // ------------------------------------------------------
-      // PRODUCT ID
-      // ------------------------------------------------------
+    //   const itemQuantity =
+    //     Number(quantity);
 
-      if (
-        !productId ||
-        !mongoose.Types.ObjectId.isValid(
-          productId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid productId: ${productId}`,
-        });
-      }
+    //   if (
+    //     !Number.isFinite(itemQuantity) ||
+    //     itemQuantity < 1 ||
+    //     !Number.isInteger(itemQuantity)
+    //   ) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: `Invalid quantity for product ${productId}.`,
+    //     });
+    //   }
 
-      // ------------------------------------------------------
-      // QUANTITY
-      // ------------------------------------------------------
+    //   // ------------------------------------------------------
+    //   // UNIT PRICE
+    //   // ------------------------------------------------------
 
-      const itemQuantity =
-        Number(quantity);
-
-      if (
-        !Number.isFinite(itemQuantity) ||
-        itemQuantity < 1 ||
-        !Number.isInteger(itemQuantity)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid quantity for product ${productId}.`,
-        });
-      }
-
-      // ------------------------------------------------------
-      // UNIT PRICE
-      // ------------------------------------------------------
-
-      const unitPrice =
-        Number(price);
+    //   const unitPrice =
+    //     Number(price);
 
 
-      if (
-        !Number.isFinite(unitPrice) ||
-        unitPrice < 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Invalid unit price for product ${productId}. ` +
-            `Received: ${price}`,
-        });
-      }
+    //   if (
+    //     !Number.isFinite(unitPrice) ||
+    //     unitPrice < 0
+    //   ) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message:
+    //         `Invalid unit price for product ${productId}. ` +
+    //         `Received: ${price}`,
+    //     });
+    //   }
 
-      // ------------------------------------------------------
-      // PRODUCT
-      // ------------------------------------------------------
+    //   // ------------------------------------------------------
+    //   // PRODUCT
+    //   // ------------------------------------------------------
 
-      const product =
-        await Product.findOne({
-          _id: productId,
-          isActive: true,
-        });
+    //   const product =
+    //     await Product.findOne({
+    //       _id: productId,
+    //       isActive: true,
+    //     });
 
-      if (!product) {
-        return res.status(404).json({
-          success: false,
-          message:
-            `Product ${productId} not found or inactive.`,
-        });
-      }
+    //   if (!product) {
+    //     return res.status(404).json({
+    //       success: false,
+    //       message:
+    //         `Product ${productId} not found or inactive.`,
+    //     });
+    //   }
 
-      // ------------------------------------------------------
-      // ITEM TOTAL
-      // ------------------------------------------------------
+    //   // ------------------------------------------------------
+    //   // ITEM TOTAL
+    //   // ------------------------------------------------------
 
-      const itemTotal =
-        unitPrice * itemQuantity;
+    //   const itemTotal =
+    //     unitPrice * itemQuantity;
 
-      if (
-        !Number.isFinite(itemTotal) ||
-        itemTotal < 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Unable to calculate total for product ${productId}.`,
-        });
-      }
+    //   if (
+    //     !Number.isFinite(itemTotal) ||
+    //     itemTotal < 0
+    //   ) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message:
+    //         `Unable to calculate total for product ${productId}.`,
+    //     });
+    //   }
 
-      // ======================================================
-      // NORMAL PRODUCT
-      // ======================================================
+    //   // ======================================================
+    //   // NORMAL PRODUCT
+    //   // ======================================================
 
-      if (!dealId) {
-        const regularPrice =
-          toSafeNumber(
-            product.price,
-            unitPrice
-          );
+    //   if (!dealId) {
+    //     const regularPrice =
+    //       toSafeNumber(
+    //         product.price,
+    //         unitPrice
+    //       );
 
-        // Calculate discount from the actual
-        // price being charged.
-        if (
-          regularPrice > unitPrice
-        ) {
-          discount +=
-            (regularPrice - unitPrice) *
-            itemQuantity;
-        }
+    //     // Calculate discount from the actual
+    //     // price being charged.
+    //     if (
+    //       regularPrice > unitPrice
+    //     ) {
+    //       discount +=
+    //         (regularPrice - unitPrice) *
+    //         itemQuantity;
+    //     }
 
-        orderItemsData.push({
-          productId:
-            product._id,
+    //     orderItemsData.push({
+    //       productId:
+    //         product._id,
 
-          dealId: null,
+    //       dealId: null,
 
-          quantity:
-            itemQuantity,
+    //       quantity:
+    //         itemQuantity,
 
-          unitPrice,
+    //       unitPrice,
 
-          totalPrice:
-            itemTotal,
+    //       totalPrice:
+    //         itemTotal,
 
-          dealPrice: null,
-        });
+    //       dealPrice: null,
+    //     });
 
-        subtotal += itemTotal;
+    //     subtotal += itemTotal;
 
-        continue;
-      }
+    //     continue;
+    //   }
 
-      // ======================================================
-      // DEAL VALIDATION
-      // ======================================================
+    //   // ======================================================
+    //   // DEAL VALIDATION
+    //   // ======================================================
 
-      if (
-        !mongoose.Types.ObjectId.isValid(
-          dealId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Invalid dealId: ${dealId}`,
-        });
-      }
+    //   if (
+    //     !mongoose.Types.ObjectId.isValid(
+    //       dealId
+    //     )
+    //   ) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message:
+    //         `Invalid dealId: ${dealId}`,
+    //     });
+    //   }
 
-      const deal =
-        await Deal.findOne({
-          _id: dealId,
-          isActive: true,
-        });
+    //   const deal =
+    //     await Deal.findOne({
+    //       _id: dealId,
+    //       isActive: true,
+    //     });
 
-      if (!deal) {
-        return res.status(404).json({
-          success: false,
-          message:
-            `Deal ${dealId} not found or inactive.`,
-        });
-      }
+    //   if (!deal) {
+    //     return res.status(404).json({
+    //       success: false,
+    //       message:
+    //         `Deal ${dealId} not found or inactive.`,
+    //     });
+    //   }
 
-      // ------------------------------------------------------
-      // FIND PRODUCT INSIDE DEAL
-      // ------------------------------------------------------
+    //   // ------------------------------------------------------
+    //   // FIND PRODUCT INSIDE DEAL
+    //   // ------------------------------------------------------
 
-      let dealProduct = null;
+    //   let dealProduct = null;
 
-      if (Array.isArray(deal.products)) {
-        dealProduct =
-          deal.products.find(
-            (dealItem) =>
-              String(
-                dealItem.productId
-              ) ===
-              String(product._id)
-          );
-      }
+    //   if (Array.isArray(deal.products)) {
+    //     dealProduct =
+    //       deal.products.find(
+    //         (dealItem) =>
+    //           String(
+    //             dealItem.productId
+    //           ) ===
+    //           String(product._id)
+    //       );
+    //   }
 
-      if (!dealProduct) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Product ${productId} does not belong to deal ${dealId}.`,
-        });
-      }
+    //   if (!dealProduct) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message:
+    //         `Product ${productId} does not belong to deal ${dealId}.`,
+    //     });
+    //   }
 
-      // ------------------------------------------------------
-      // DEAL PRICE
-      // ------------------------------------------------------
+    //   // ------------------------------------------------------
+    //   // DEAL PRICE
+    //   // ------------------------------------------------------
 
-      const dealPrice =
-        toSafeNumber(
-          dealProduct.dealPrice ??
-            dealProduct.price ??
-            unitPrice,
-          unitPrice
-        );
+    //   const dealPrice =
+    //     toSafeNumber(
+    //       dealProduct.dealPrice ??
+    //         dealProduct.price ??
+    //         unitPrice,
+    //       unitPrice
+    //     );
 
-      if (
-        !Number.isFinite(dealPrice) ||
-        dealPrice < 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Invalid deal price for product ${productId}.`,
-        });
-      }
+    //   if (
+    //     !Number.isFinite(dealPrice) ||
+    //     dealPrice < 0
+    //   ) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message:
+    //         `Invalid deal price for product ${productId}.`,
+    //     });
+    //   }
 
-      // ------------------------------------------------------
-      // DEAL DISCOUNT
-      // ------------------------------------------------------
+    //   // ------------------------------------------------------
+    //   // DEAL DISCOUNT
+    //   // ------------------------------------------------------
 
-      const regularPrice =
-        toSafeNumber(
-          product.price,
-          unitPrice
-        );
+    //   const regularPrice =
+    //     toSafeNumber(
+    //       product.price,
+    //       unitPrice
+    //     );
 
-      if (
-        regularPrice > unitPrice
-      ) {
-        discount +=
-          (regularPrice - unitPrice) *
-          itemQuantity;
-      }
+    //   if (
+    //     regularPrice > unitPrice
+    //   ) {
+    //     discount +=
+    //       (regularPrice - unitPrice) *
+    //       itemQuantity;
+    //   }
 
-      // ------------------------------------------------------
-      // ADD DEAL ITEM
-      // ------------------------------------------------------
+    //   // ------------------------------------------------------
+    //   // ADD DEAL ITEM
+    //   // ------------------------------------------------------
 
-      orderItemsData.push({
-        productId:
-          product._id,
+    //   orderItemsData.push({
+    //     productId:
+    //       product._id,
 
-        dealId:
-          deal._id,
+    //     dealId:
+    //       deal._id,
 
-        quantity:
-          itemQuantity,
+    //     quantity:
+    //       itemQuantity,
 
-        unitPrice,
+    //     unitPrice,
 
-        totalPrice:
-          itemTotal,
+    //     totalPrice:
+    //       itemTotal,
 
-        dealPrice,
-      });
+    //     dealPrice,
+    //   });
 
-      subtotal += itemTotal;
-    }
+    //   subtotal += itemTotal;
+    // }
 
     // ========================================================
     // NORMALIZE SUBTOTAL
     // ========================================================
 
-    subtotal = Number(
-      subtotal.toFixed(2)
-    );
+    // subtotal = Number(
+    //   subtotal.toFixed(2)
+    // );
 
-    discount = Number(
-      discount.toFixed(2)
-    );
+    // discount = Number(
+    //   discount.toFixed(2)
+    // );
 
     // ========================================================
     // FINAL TOTAL
     // ========================================================
 
-    const calculatedTotal =
-      subtotal -
-      discount +
-      safeDeliveryCharges;
+    // const calculatedTotal =
+    //   subtotal -
+    //   discount +
+    //   safeDeliveryCharges;
 
-    const total = Number(
-      Math.max(
-        calculatedTotal,
-        0
-      ).toFixed(2)
-    );
+    // const total = Number(
+    //   Math.max(
+    //     calculatedTotal,
+    //     0
+    //   ).toFixed(2)
+    // );
 
     // ========================================================
     // FINAL NUMBER VALIDATION
     // ========================================================
 
-    if (
-      !Number.isFinite(subtotal)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid subtotal calculation.",
-      });
-    }
+    // if (
+    //   !Number.isFinite(subtotal)
+    // ) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "Invalid subtotal calculation.",
+    //   });
+    // }
 
     if (
       !Number.isFinite(discount)
@@ -548,6 +541,9 @@ const createOrder = async (req, res, next) => {
 
     const orderNumber =
       generateOrderNumber();
+
+
+
 
     const order =
       new Order({
@@ -620,9 +616,10 @@ const createOrder = async (req, res, next) => {
 
         paymentStatus: "Pending",
 
-        subtotal,
+        subTotal,
 
         discount,
+        total,
 
         deliveryCharges:
           safeDeliveryCharges,
@@ -642,32 +639,25 @@ const createOrder = async (req, res, next) => {
     // ========================================================
     // CREATE ORDER ITEMS
     // ========================================================
-
-    const orderItems =
-      orderItemsData.map(
-        (item) => ({
-          orderId:
-            order._id,
-
-          productId:
-            item.productId,
-
-          dealId:
-            item.dealId,
-
-          quantity:
-            item.quantity,
-
-          unitPrice:
-            item.unitPrice,
-
-          totalPrice:
-            item.totalPrice,
-
-          dealPrice:
-            item.dealPrice,
-        })
-      );
+    
+          let orderItems = [];
+    for (const requestedItem of items) {
+      if (!requestedItem) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid order item.",
+        });
+      }
+    orderItems.push({
+      orderId: order._id,
+      quantity: requestedItem.quantity,
+      unitPrice: requestedItem.unitPrice,
+      dealId: requestedItem.dealId,
+      dealPrice: requestedItem.dealPrice,
+      productId: requestedItem.productId,
+      totalPrice: requestedItem.quantity * requestedItem.unitPrice,
+    })
+    }
 
     await OrderItem.insertMany(
       orderItems,
@@ -683,8 +673,7 @@ const createOrder = async (req, res, next) => {
     await OrderTimeline.create(
       [
         {
-          orderId:
-            order._id,
+          orderId:order._id,
 
           status: "Pending",
 

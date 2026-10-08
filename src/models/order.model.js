@@ -206,7 +206,7 @@ const orderSchema = new mongoose.Schema(
     // ORDER AMOUNTS
     // =====================================================
 
-    subtotal: {
+    subTotal: {
       type: Number,
       required: true,
       min: 0,
