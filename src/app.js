@@ -4,7 +4,6 @@ const cors = require("cors");
 const morgan = require("morgan");
 const routes = require("./routes");
 const app = express();
-const categoryRoutes = require("./routes/category.routes");
 
 app.use(cors());
 //app.use(helmet());
