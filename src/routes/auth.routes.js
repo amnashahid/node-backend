@@ -1,38 +1,15 @@
-// src/routes/auth.routes.js
-
 const express = require("express");
-
-const {
-    register,
-    verifyPhoneOtp,
-    completeProfile,
-    adminLogin
-} = require("../controllers/auth.controller");
-
-const authMiddleware =
-    require("../middleware/auth.middleware");
+const controller = require("../controllers/auth.controller");
+const authenticate = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
-router.post(
-    "/register",
-    register
-);
-
-router.post(
-    "/verify-otp",
-    verifyPhoneOtp
-);
-
-router.post(
-    "/complete-profile",
-    authMiddleware,
-    completeProfile
-);
-
-router.post(
-    "/admin-login",
-    adminLogin
-);
+router.post("/send-otp", controller.sendOtp);
+router.post("/verify-otp", controller.verifyOtp);
+router.post("/refresh", controller.refresh);
+router.post("/logout", controller.logout);
+router.get("/me", authenticate, controller.me);
+router.post("/admin-login", controller.adminLogin);
+router.put("/complete-profile", authenticate, controller.completeProfile);
 
 module.exports = router;

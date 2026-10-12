@@ -1,160 +1,207 @@
-const StoreSettings = require("../models/storeSettings.model");
 
-// ============================================
-// GET STORE SETTINGS
-// ============================================
+const StoreSettings = require("../models/StoreSettings");
 
-const getStoreSettings = async (req, res, next) => {
+const allowedFields = [
+  "storeName",
+  "storeNotes",
+  "lat",
+  "lon",
+  "currency",
+  "defaultDeliveryCharge",
+  "minimumOrderAmount",
+];
+
+function serializeSettings(settings) {
+  if (!settings) return null;
+
+  const data = {};
+
+  for (const field of allowedFields) {
+    data[field] = settings[field];
+  }
+
+  if (settings._id) data._id = settings._id;
+  if (settings.createdAt) data.createdAt = settings.createdAt;
+  if (settings.updatedAt) data.updatedAt = settings.updatedAt;
+
+  return data;
+}
+
+// GET /api/store-settings
+exports.getPublicSettings = async (req, res) => {
   try {
-    let settings = await StoreSettings.findOne();
+    const settings = await StoreSettings.findOne().lean();
 
-    // Create default settings if none exists
     if (!settings) {
-      settings = await StoreSettings.create({
-        storeName: "My Grocery Store",
-        storeNotes: "",
-        latitude: 0,
-        longitude: 0,
-        radius: 1,
-        radiusUnit: "km",
-        isActive: true,
+      return res.status(404).json({
+        success: false,
+        message: "Store settings have not been configured.",
       });
     }
 
-    res.status(200).json({
+    return res.json({
       success: true,
-      data: {
-        ...settings.toObject(),
-        StoreName: settings.storeName,
-      },
+      data: serializeSettings(settings),
     });
   } catch (error) {
-    next(error);
+    console.error("getPublicSettings:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch store settings.",
+    });
   }
 };
 
-// ============================================
-// CREATE / UPDATE STORE SETTINGS
-// ============================================
-
-const updateStoreSettings = async (req, res, next) => {
+// GET /api/store-settings/admin
+exports.getAdminSettings = async (req, res) => {
   try {
-    const {
-      storeName,
-      StoreName,
-      storeNotes,
-      latitude,
-      longitude,
-      radius,
-      radiusUnit,
-      isActive,
-    } = req.body;
+    const settings = await StoreSettings.findOne().lean();
 
-    const resolvedStoreName = storeName || StoreName;
+    return res.json({
+      success: true,
+      data: serializeSettings(settings),
+    });
+  } catch (error) {
+    console.error("getAdminSettings:", error);
 
-    // ================================
-    // VALIDATION
-    // ================================
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch store settings.",
+    });
+  }
+};
 
-    if (!resolvedStoreName || !resolvedStoreName.trim()) {
+// PUT /api/store-settings/admin
+exports.upsertSettings = async (req, res) => {
+  try {
+    const updates = {};
+
+    for (const field of allowedFields) {
+      if (
+        Object.prototype.hasOwnProperty.call(req.body, field)
+      ) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (!updates.storeName || typeof updates.storeName !== "string" ||
+        !updates.storeName.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Store name is required",
+        message: "Store name is required.",
       });
     }
 
-    const lat = Number(latitude);
-    const lng = Number(longitude);
-    const radiusValue = Number(radius);
-
-    if (!Number.isFinite(lat)) {
+    if (
+      updates.storeNotes !== undefined &&
+      typeof updates.storeNotes !== "string"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Valid latitude is required",
+        message: "Store notes must be a string.",
       });
     }
 
-    if (!Number.isFinite(lng)) {
+    const numericFields = [
+      "lat",
+      "lon",
+      "defaultDeliveryCharge",
+      "minimumOrderAmount",
+    ];
+
+    for (const field of numericFields) {
+      const value = updates[field];
+
+      if (
+        value === undefined ||
+        value === "" ||
+        value === null ||
+        typeof value !== "number" ||
+        !Number.isFinite(value)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `${field} must be a valid number.`,
+        });
+      }
+    }
+
+    if (updates.lat < -90 || updates.lat > 90) {
       return res.status(400).json({
         success: false,
-        message: "Valid longitude is required",
+        message: "Latitude must be between -90 and 90.",
       });
     }
 
-    if (!Number.isFinite(radiusValue) || radiusValue < 0) {
+    if (updates.lon < -180 || updates.lon > 180) {
       return res.status(400).json({
         success: false,
-        message: "Valid radius is required",
+        message: "Longitude must be between -180 and 180.",
       });
     }
 
-    // Latitude range
-    if (lat < -90 || lat > 90) {
+    if (
+      updates.defaultDeliveryCharge < 0 ||
+      updates.minimumOrderAmount < 0
+    ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Latitude must be between -90 and 90",
+        message: "Charges and minimum order must be 0 or greater.",
       });
     }
 
-    // Longitude range
-    if (lng < -180 || lng > 180) {
+    const currency = updates.currency;
+
+    if (
+      typeof currency !== "string" ||
+      !/^[A-Za-z]{3}$/.test(currency.trim())
+    ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Longitude must be between -180 and 180",
+        message: "Currency must be a three-letter currency code, such as PKR.",
       });
     }
 
-    // ================================
-    // UPDATE EXISTING SETTINGS
-    // ================================
+    updates.storeName = updates.storeName.trim();
+    updates.currency = currency.trim().toUpperCase();
 
+    if (updates.storeNotes !== undefined) {
+      updates.storeNotes = updates.storeNotes.trim();
+    }
+
+    // Keep one settings document for this single-store app.
     let settings = await StoreSettings.findOne();
 
     if (settings) {
-      settings.storeName = resolvedStoreName.trim();
-      settings.storeNotes = storeNotes || "";
-      settings.latitude = lat;
-      settings.longitude = lng;
-      settings.radius = radiusValue;
-      settings.radiusUnit = radiusUnit || "km";
-
-      if (typeof isActive === "boolean") {
-        settings.isActive = isActive;
-      }
-
-      await settings.save();
+      Object.assign(settings, updates);
     } else {
-      // ================================
-      // CREATE SETTINGS
-      // ================================
+      settings = new StoreSettings(updates);
+    }
 
-      settings = await StoreSettings.create({
-        storeName: resolvedStoreName.trim(),
-        storeNotes: storeNotes || "",
-        latitude: lat,
-        longitude: lng,
-        radius: radiusValue,
-        radiusUnit: radiusUnit || "km",
-        isActive:
-          typeof isActive === "boolean"
-            ? isActive
-            : true,
+    await settings.save();
+
+    return res.json({
+      success: true,
+      message: "Store settings saved successfully.",
+      data: serializeSettings(settings.toObject()),
+    });
+  } catch (error) {
+    console.error("upsertSettings:", error);
+
+    if (
+      error.name === "ValidationError" ||
+      error.name === "CastError"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
       });
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Store settings saved successfully",
-      data: settings,
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save store settings.",
     });
-  } catch (error) {
-    next(error);
   }
-};
-
-module.exports = {
-  getStoreSettings,
-  updateStoreSettings,
 };

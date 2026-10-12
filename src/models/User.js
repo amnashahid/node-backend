@@ -4,38 +4,15 @@ const addressSchema = new mongoose.Schema(
   {
     label: {
       type: String,
-      trim: true,
-      default: "Home",
+      enum: ["HOME", "WORK", "OTHER"],
+      default: "HOME",
     },
-
-    address: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    location: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
-    latitude: {
-      type: Number,
-    },
-
-    longitude: {
-      type: Number,
-    },
-
-    isDefault: {
-      type: Boolean,
-      default: false,
-    },
+    addressLine: { type: String, trim: true },
+    latitude: Number,
+    longitude: Number,
+    isDefault: { type: Boolean, default: false },
   },
-  {
-    _id: true,
-  }
+  { timestamps: true }
 );
 
 const userSchema = new mongoose.Schema(
@@ -46,58 +23,25 @@ const userSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
-
-    phoneVerified: {
-      type: Boolean,
-      default: false,
-    },
-
+    phoneVerified: { type: Boolean, default: false },
+    firstName: { type: String, trim: true, default: "" },
+    lastName: { type: String, trim: true, default: "" },
+    email: { type: String, trim: true, lowercase: true },
     language: {
       type: String,
       enum: ["en", "ur"],
-      required: true,
+      default: "en",
     },
-
-    name: {
-      type: String,
-      trim: true,
-    },
-
-    email: {
-      type: String,
-      lowercase: true,
-      trim: true,
-    },
-
-    addresses: {
-      type: [addressSchema],
-      default: [],
-    },
-
-    otp: {
-      type: String,
-      trim: true,
-    },
-
-    profileCompleted: {
-      type: Boolean,
-      default: false,
-    },
-
+    addresses: [addressSchema],
+    profileCompleted: { type: Boolean, default: false },
     role: {
       type: String,
       enum: ["customer", "admin"],
       default: "customer",
     },
-
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+    isActive: { type: Boolean, default: true },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("User", userSchema);

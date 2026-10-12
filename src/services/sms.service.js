@@ -1,17 +1,10 @@
-// src/services/sms.service.js
+async function sendOtpSms(phone, otp) {
+  if (process.env.OTP_DEBUG === "true") {
+    console.log(`[DEV ONLY] OTP for ${phone}: ${otp}`);
+    return;
+  }
 
-const sendSms = async (phone, message) => {
 
-    // TODO:
-    // Connect your SMS provider here.
+}
 
-    console.log("SMS");
-    console.log("To:", phone);
-    console.log("Message:", message);
-
-    return true;
-};
-
-module.exports = {
-    sendSms
-};
+module.exports = { sendOtpSms };
