@@ -479,10 +479,11 @@ exports.adminLogin = async (req, res, next) => {
         message: "Account is unavailable.",
       });
     }
+    const tokens = await issueTokens(user);
 
     return res.json({
       success: true,
-      data: { user: publicUser(user) },
+      data: { user: publicUser(user), ...tokens },
     });
   } catch (error) {
     next(error);

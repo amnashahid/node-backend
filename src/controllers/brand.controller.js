@@ -11,7 +11,6 @@ const getBrands = async (req, res, next) => {
       "name": 1,
     });
 
-    console.log(brands);
     res.status(200).json({
       success: true,
       count: brands.length,
