@@ -9,16 +9,16 @@ const requireAdmin = require("../middleware/requireAdmin.middleware");
 router.get("/", controller.getPublicSettings);
 
 router.get(
-  "/",
-//   authenticate,
-//   requireAdmin,
+  "/admin",
+  authenticate,
+  requireAdmin,
   controller.getAdminSettings
 );
 
 router.put(
   "/admin",
-//   authenticate,
-//   requireAdmin,
+  authenticate,
+  requireAdmin,
   controller.upsertSettings
 );
 
