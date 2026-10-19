@@ -22,6 +22,7 @@ const dealRoutes = require("./deal.routes");
 const sectionRoutes = require("./section.routes");
 const deliverySlotRoutes = require("./deliverySlot.routes");
 const deliveryChargeRoutes = require("./deliveryCharge.routes");
+const orderRoutes = require("./order.routes");
 
 
 router.use("/auth",  authRoutes );
@@ -36,5 +37,5 @@ router.use("/deals", dealRoutes);
 router.use("/sections", sectionRoutes);
 router.use("/delivery-slots", deliverySlotRoutes);
 router.use("/delivery-charges", deliveryChargeRoutes);
-  
+router.use("/orders", orderRoutes);
 module.exports = router;

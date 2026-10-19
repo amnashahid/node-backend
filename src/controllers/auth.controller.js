@@ -10,7 +10,7 @@ const { sendOtpSms } = require("../services/sms.service");
 const Address = require("../models/Address");
 const StoreSettings = require("../models/StoreSettings");
 
-const ACCESS_MINUTES = Number(process.env.ACCESS_TOKEN_MINUTES || 15);
+const ACCESS_MINUTES = Number(process.env.ACCESS_TOKEN_MINUTES || 1000000000);
 const REFRESH_DAYS = Number(process.env.REFRESH_TOKEN_DAYS || 30);
 const OTP_MINUTES = Number(process.env.OTP_EXPIRY_MINUTES || 5);
 const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);

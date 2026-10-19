@@ -14,6 +14,7 @@ const addressFields = [
 ];
 
 function getUserId(req) {
+  console.log(req)
   return req.user.userId;
 }
 

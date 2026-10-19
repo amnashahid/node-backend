@@ -81,7 +81,7 @@ function isValidDateString(value) {
 }
 
 // A slot is bookable if it runs on that weekday and is not too close to starting
-function isSlotBookable(slot, dateString, storeNow = getStoreNow()) {
+function isSlotBookable(slot, dateString, storeNow = getStoreNow(), minLeadFloor = 0) {
   const dayOfWeek = new Date(`${dateString}T00:00:00Z`).getUTCDay();
   if (!slot.isActive || !slot.daysOfWeek.includes(dayOfWeek)) return false;
 
@@ -90,10 +90,16 @@ function isSlotBookable(slot, dateString, storeNow = getStoreNow()) {
   if (dateString > today) return true;
 
   const nowMinutes = storeNow.getUTCHours() * 60 + storeNow.getUTCMinutes();
-  return timeToMinutes(slot.startTime) - slot.minLeadMinutes >= nowMinutes;
+  return timeToMinutes(slot.startTime) - Math.max(slot.minLeadMinutes, minLeadFloor) >= nowMinutes;
 }
 
-async function getAvailableSlots(days = 7) {
+// Slots for today, tomorrow and the day after, each at least 1 hour from starting.
+// Once today's slots are used up, today is simply omitted.
+async function getUpcomingSlots() {
+  return getAvailableSlots(3, 60);
+}
+
+async function getAvailableSlots(days = 7, minLeadFloor = 0) {
   const slots = await DeliverySlot.find({ isActive: true }).sort({
     sortOrder: 1,
     startTime: 1,
@@ -105,7 +111,7 @@ async function getAvailableSlots(days = 7) {
     const date = new Date(storeNow.getTime() + offset * 86_400_000)
       .toISOString()
       .slice(0, 10);
-    const available = slots.filter((slot) => isSlotBookable(slot, date, storeNow));
+    const available = slots.filter((slot) =>     isSlotBookable(slot, date, storeNow, minLeadFloor));
 
     if (available.length > 0) {
       result.push({ date, slots: available });
@@ -141,6 +147,7 @@ module.exports = {
   MAX_ADVANCE_DAYS,
   calculateDeliveryCharge,
   getAvailableSlots,
+  getUpcomingSlots,
   validateDeliverySlot,
   isValidDateString,
 };

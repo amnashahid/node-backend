@@ -3,6 +3,7 @@ const DeliverySlot = require("../models/deliverySlot.model");
 const {
   MAX_ADVANCE_DAYS,
   getAvailableSlots,
+  getUpcomingSlots,
 } = require("../services/delivery.service");
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -80,6 +81,15 @@ exports.getAvailable = async (req, res, next) => {
     }
 
     return res.json({ success: true, data: await getAvailableSlots(days) });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// GET /api/delivery-slots/upcoming (today, tomorrow, day after tomorrow)
+exports.getUpcoming = async (req, res, next) => {
+  try {
+    return res.json({ success: true, data: await getUpcomingSlots() });
   } catch (error) {
     return next(error);
   }

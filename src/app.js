@@ -26,7 +26,6 @@ app.get("/health", (req, res) => {
     message: "E-Commerce API is running"
   });
 });
-
 app.use("/Uploads", express.static(path.join(__dirname, '/uploads')));
 app.use("/api", routes);
 app.use(notFoundMiddleware);
