@@ -316,7 +316,8 @@ async function getCompleteOrder(orderId) {
  */
 exports.getOrder = async (req, res) => {
   try {
-    const { id } = req.params;
+    //const { id } = req.user._id || req.user?.id || {}   ;
+    const id = req.params.id;
 
     const order = await getCompleteOrder(id);
 
@@ -346,7 +347,7 @@ exports.getOrder = async (req, res) => {
  */
 exports.getUserOrders = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user?.userId;
 
     const orders = await Order.find({
       user: userId,
@@ -479,7 +480,7 @@ exports.updateOrderStatus = async (req, res) => {
   try {
     session.startTransaction();
 
-    const { id } = req.params;
+    const id = req.params.id; // req.user?._id || req.user?.id;
 
     const {
       status,
@@ -590,7 +591,8 @@ exports.updateOrderStatus = async (req, res) => {
  */
 exports.getOrderWorkflow = async (req, res) => {
   try {
-    const { id } = req.params;
+    const userId = req.user?.userId || req.user?.id;
+const id = req.params.id;
 
     const workflow = await OrderWorkflow.find({
       order: id,
@@ -618,10 +620,11 @@ exports.getOrderWorkflow = async (req, res) => {
  */
 exports.currentStatus = async (req, res) => {
 
-    console.log("Fetching current status for user:", req.users?._id || req.user?.id);
+    console.log("Fetching current status for user:", req.user);
+    console.log("Fetching current status for user:", req.user?.userId || req.user?.id);
   try {
     // User ID comes from authentication middleware, not request parameters.
-    const userId = req.user?._id || req.user?.id;
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
 
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({
@@ -630,11 +633,12 @@ exports.currentStatus = async (req, res) => {
       });
     }
 
+    console.log("User ID:", userId);
     // Find the user's latest order.
     const order = await Order.findOne({
       user: userId,
     })
-      .sort({ createdAt: -1, _id: -1 })
+      .sort({ createdAt: -1})
       .lean();
 
     if (!order) {
@@ -650,7 +654,7 @@ exports.currentStatus = async (req, res) => {
     const workflow = await OrderWorkflow.find({
       order: order._id,
     })
-      .sort({ createdAt: -1, _id: -1 })
+      .sort({ createdAt: -1, _id    : -1 })
       .lean();
 
     return res.status(200).json({
