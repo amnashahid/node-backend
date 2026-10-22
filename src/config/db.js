@@ -1,25 +1,24 @@
-
 const mongoose = require("mongoose");
 
 async function connectDB() {
-  const mongoUri = process.env.MONGODB_URI;
+  const uri = process.env.MONGODB_URI;
 
-  if (!mongoUri) {
-    throw new Error("MONGODB_URI is missing from environment variables");
+  if (!uri) {
+    throw new Error("MONGODB_URI is missing");
   }
 
   try {
-    console.log("Connecting to MongoDB Atlas...");
+    console.log("Connecting to MongoDB...");
 
-    await mongoose.connect(mongoUri, {
+    await mongoose.connect(uri, {
       serverSelectionTimeoutMS: 15000,
     });
 
     console.log("MongoDB connected successfully");
-    console.log("Database name:", mongoose.connection.name);
+    console.log("Database:", mongoose.connection.name);
   } catch (error) {
-    console.error("MongoDB connection error:", error.name);
-    console.error("Details:", error.message);
+    console.error("MongoDB connection failed:", error.name);
+    console.error(error.message);
     throw error;
   }
 }
