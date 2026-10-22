@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-
+mongoose.set('bufferCommands', false);
 async function connectDB() {
   const uri = process.env.MONGODB_URI;
 
