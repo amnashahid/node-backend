@@ -26,6 +26,20 @@ app.get("/health", (req, res) => {
     message: "E-Commerce API is running"
   });
 });
+app.get("/api/server-ip", async (req, res) => {
+    try {
+        const response = await fetch("https://api.ipify.org?format=json");
+        const data = await response.json();
+
+        res.json({
+            ip: data.ip
+        });
+    } catch (error) {
+        res.status(500).json({
+            error: error.message
+        });
+    }
+});
 app.use("/Uploads", express.static(path.join(__dirname, '/uploads')));
 app.use("/api", routes);
 app.use(notFoundMiddleware);
