@@ -5,8 +5,8 @@ const authorizeRoles = require("../middleware/role.middleware");
 
 const router = express.Router();
 
-router.get("/available", controller.getAvailable);
-router.get("/upcoming", controller.getUpcoming);
+router.get("/available", authenticate,controller.getAvailable);
+router.get("/upcoming", authenticate, controller.getUpcoming);
 
 router.get("/", authenticate, authorizeRoles("admin"), controller.getSlots);
 router.post("/", authenticate, authorizeRoles("admin"), controller.createSlot);
