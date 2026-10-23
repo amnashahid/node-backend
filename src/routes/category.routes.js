@@ -32,21 +32,21 @@ router.get(
  // Get main categories
 router.get(
   "/main",
-  // authMiddleware,
+   authMiddleware,
   getMainCategories
 );
 
 // Get top categories (must be before "/:id")
 router.get(
   "/top",
-  //authMiddleware,
+  authMiddleware,
   getTopCategories
 );
 
 // Get subcategories of a category
 router.get(
   "/:categoryId/subcategories",
-  //authMiddleware,
+  authMiddleware,
   getSubCategories
 );
 
@@ -66,7 +66,7 @@ router.get(
 router.post(
   "/",
   authMiddleware,
-  //roleMiddleware("admin"),
+  roleMiddleware("admin"),
  uploadImage.single("image"),
   createCategory
 );

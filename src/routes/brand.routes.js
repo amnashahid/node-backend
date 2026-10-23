@@ -13,35 +13,30 @@ const authorize = require("../middleware/role.middleware");
 
 router.get(
   "/",
-  //authenticate,
+  authenticate,
   getBrands
 );
 
 
 router.post(
   "/",
- // authenticate,
-//   authorize("admin"),
+ authenticate,
+  authorize("admin"),
   uploadBrandImage.single("image"),
   createBrand
 );
 
-// router.get(
-//   "/:id",
-//   authenticate,
-//   brandController.getBrandById
-// );
 router.put(
   "/:id",
-  //authenticate,
- // authorize("admin"),
+  authenticate,
+ authorize("admin"),
   uploadBrandImage.single("image"),
   updateBrand
 );
 router.delete(
   "/:id",
-  //authenticate,
-  //authorize("admin"),
+  authenticate,
+  authorize("admin"),
   deleteBrand
 );
 

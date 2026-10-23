@@ -37,18 +37,21 @@ router.get(
 // Get single complete order
 router.get(
   "/:id",
+  authenticate,
   orderController.getOrder
 );
 
 // Get order status history
 router.get(
   "/:id/workflow",
+  authenticate,
   orderController.getOrderWorkflow
 );
 
 // Update order status
 router.put(
   "/:id/status",
+  authenticate,
   orderController.updateOrderStatus
 );
 router.get(

@@ -5,8 +5,8 @@ const authorizeRoles = require("../middleware/role.middleware");
 
 const router = express.Router();
 
-router.get("/", controller.getConfig);
-router.post("/calculate", controller.calculate);
+router.get("/",authenticate, controller.getConfig);
+router.post("/calculate", authenticate,controller.calculate);
 router.put("/", authenticate, authorizeRoles("admin"), controller.upsertConfig);
 
 module.exports = router;

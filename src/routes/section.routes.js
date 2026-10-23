@@ -7,13 +7,14 @@ const router = express.Router();
 
 //router.use(authenticate);
 
-router.get("/", controller.getSections);
-router.get("/:id", controller.getSectionById);
-router.post("/", //authorizeRoles("admin"), 
+router.get("/", authenticate, controller.getSections);
+router.get("/:id", authenticate, controller.getSectionById);
+router.post("/", authenticate, authorizeRoles("admin"), 
 controller.createSection);
-router.put("/:id", //authorizeRoles("admin"), 
+router.put("/:id", authenticate, authorizeRoles("admin"), 
     controller.updateSection);
-router.delete("/:id", //authorizeRoles("admin"), 
+router.delete("/:id", authorizeRoles("admin"), 
+    authenticate,
     controller.deleteSection);
 
 module.exports = router;
