@@ -158,8 +158,10 @@ exports.sendOtp = async (req, res, next) => {
 // POST /api/auth/verify-otp
 exports.verifyOtp = async (req, res, next) => {
   try {
+    console.log("Verifying OTP");
     const phone = normalizePhone(req.body.phone);
     const otp = String(req.body.otp || "");
+    console.log(otp);
     console.log(phone);
     if (!phone || !/^\d{6}$/.test(otp)) {
       return res.status(400).json({
@@ -169,13 +171,14 @@ exports.verifyOtp = async (req, res, next) => {
     }
 
     const record = await Otp.findOne({ phone });
-
+    console.log(record);
     if (!record || record.expiresAt <= new Date()) {
       return res.status(400).json({
         success: false,
         message: "OTP expired or not found. Request a new OTP.",
       });
     }
+    console.log(record.attempts);
 
     if (record.attempts >= OTP_MAX_ATTEMPTS) {
       return res.status(429).json({
@@ -189,6 +192,7 @@ exports.verifyOtp = async (req, res, next) => {
     if (!matches) {
       record.attempts += 1;
       await record.save();
+      console.log("Attempt saved");
 
       return res.status(400).json({
         success: false,
@@ -199,7 +203,7 @@ exports.verifyOtp = async (req, res, next) => {
         ),
       });
     }
-
+    console.log("OTP verified");
     await Otp.deleteOne({ _id: record._id });
 
     let user = await User.findOne({ phone });
