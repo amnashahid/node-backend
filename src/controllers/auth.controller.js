@@ -173,6 +173,7 @@ exports.verifyOtp = async (req, res, next) => {
     const record = await Otp.findOne({ phone });
     console.log(record);
     if (!record || record.expiresAt <= new Date()) {
+      console.log("OTP expired");
       return res.status(400).json({
         success: false,
         message: "OTP expired or not found. Request a new OTP.",
