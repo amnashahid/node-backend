@@ -14,7 +14,6 @@ const addressFields = [
 ];
 
 function getUserId(req) {
-  console.log(req)
   return req.user.userId;
 }
 
@@ -232,6 +231,7 @@ exports.updateProfile = async (req, res, next) => {
 };
 
 exports.getAddresses = async (req, res, next) => {
+  console.log("Fetching addresses");
   try {
     const addresses = await Address.find({ userId: getUserId(req) }).sort({
       isDefault: -1,

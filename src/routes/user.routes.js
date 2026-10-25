@@ -4,7 +4,6 @@ const controller = require("../controllers/user.controller");
 
 const router = express.Router();
 
-//router.use(authMiddleware);
 
 router.get("/me", authMiddleware, controller.getProfile);
 router.put("/me", authMiddleware, controller.updateProfile);
