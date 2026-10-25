@@ -160,7 +160,7 @@ exports.verifyOtp = async (req, res, next) => {
   try {
     const phone = normalizePhone(req.body.phone);
     const otp = String(req.body.otp || "");
-
+    console.log(phone);
     if (!phone || !/^\d{6}$/.test(otp)) {
       return res.status(400).json({
         success: false,
