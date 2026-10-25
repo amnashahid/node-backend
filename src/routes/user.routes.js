@@ -1,16 +1,16 @@
 const express = require("express");
-const authenticate = require("../middleware/auth.middleware");
+const authMiddleware = require("../middleware/auth.middleware");
 const controller = require("../controllers/user.controller");
 
 const router = express.Router();
 
-router.use(authenticate);
+//router.use(authMiddleware);
 
-router.get("/me", controller.getProfile);
-router.put("/me", controller.updateProfile);
-router.get("/me/addresses", controller.getAddresses);
-router.post("/me/addresses", controller.addAddress);
-router.patch("/me/addresses/:addressId", controller.updateAddress);
-router.delete("/me/addresses/:addressId", controller.deleteAddress);
+router.get("/me", authMiddleware, controller.getProfile);
+router.put("/me", authMiddleware, controller.updateProfile);
+router.get("/me/addresses", authMiddleware, controller.getAddresses);
+router.post("/me/addresses", authMiddleware, controller.addAddress);
+router.put("/me/addresses/:addressId", authMiddleware, controller.updateAddress);
+router.delete("/me/addresses/:addressId", authMiddleware, controller.deleteAddress);
 
 module.exports = router;
