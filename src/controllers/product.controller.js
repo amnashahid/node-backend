@@ -448,6 +448,19 @@ const getProductByCategory = async (req, res, next) => {
     next(error);
   }
 };
+const getProductByBrand = async (req, res, next) => {
+  try {
+    const { brandId } = req.params;
+    const products = await Product.find({ brandId: brandId });
+    return res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   createProduct,
   getProducts,
@@ -455,4 +468,5 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getProductByCategory,
+  getProductByBrand
 };
