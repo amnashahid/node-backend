@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 
-const {createBrand, getBrands, updateBrand, deleteBrand} = require("../controllers/brand.controller");
+const {createBrand, getBrands, updateBrand, deleteBrand, importBrands} = require("../controllers/brand.controller");
 
 const authenticate = require("../middleware/auth.middleware");
 const authorize = require("../middleware/role.middleware");
@@ -39,5 +39,7 @@ router.delete(
   authorize("admin"),
   deleteBrand
 );
+router.post("/import", authenticate, authorize("admin"), importBrands);
+
 
  module.exports = router;
