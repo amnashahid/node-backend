@@ -1,5 +1,5 @@
 
-const Ad = require("../models/Ad");
+const Ad = require("../models/Ad.model");
 
 // GET /api/ads
 // Get all active ads for the mobile app

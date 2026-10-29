@@ -5,8 +5,8 @@ const router = express.Router();
 const adController = require("../controllers/adController");
 
 // Replace these imports with your existing middleware paths.
-const authMiddleware = require("../middleware/authMiddleware");
-const adminMiddleware = require("../middleware/adminMiddleware");
+const authMiddleware = require("../middleware/auth.middleware");
+const adminMiddleware = require("../middleware/role.middleware");
 
 // Public endpoints for the mobile app
 router.get("/", adController.getAds);
