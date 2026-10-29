@@ -208,9 +208,9 @@ const importBrands = async (req, res, next) => {
             const filename = `brand-${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}${fileExtension}`;
             
             // Define paths
-            const uploadDir = path.join(__dirname, '../public/uploads/brands');
+            const uploadDir = path.join(__dirname, '../src/uploads/brands');
             const absoluteDestinationPath = path.join(uploadDir, filename);
-            var relativeDatabasePath = `/uploads/brands/${filename}`; // Public URL path for your API
+            var relativeDatabasePath = `/brands/${filename}`; // Public URL path for your API
 
             // 2. Ensure directory exists 
             fs.mkdirSync(uploadDir, { recursive: true })
