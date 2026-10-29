@@ -23,6 +23,7 @@ const sectionRoutes = require("./section.routes");
 const deliverySlotRoutes = require("./deliverySlot.routes");
 const deliveryChargeRoutes = require("./deliveryCharge.routes");
 const orderRoutes = require("./order.routes");
+const adRoutes = require("./ad.routes");
 
 
 router.use("/auth",  authRoutes );
@@ -38,4 +39,5 @@ router.use("/sections", sectionRoutes);
 router.use("/delivery-slots", deliverySlotRoutes);
 router.use("/delivery-charges", deliveryChargeRoutes);
 router.use("/orders", orderRoutes);
+router.use("/ads", adRoutes);
 module.exports = router;
