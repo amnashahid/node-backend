@@ -39,7 +39,7 @@ router.delete(
   authorize("admin"),
   deleteBrand
 );
-router.post("/import", authenticate, authorize("admin"), importBrands);
+router.post("/import",authenticate, authorize("admin"), importBrands);
 
 
  module.exports = router;
