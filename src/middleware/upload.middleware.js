@@ -5,7 +5,8 @@ const fs = require("fs");
 const uploadPath = path.join(
   process.cwd(),
   "src",
-  "uploads"
+  "uploads",
+  "brands"
 );
 
 if (!fs.existsSync(uploadPath)) {
@@ -23,7 +24,7 @@ const storage = multer.diskStorage({
     const extension = path.extname(file.originalname);
 
     const fileName =
-      `${file.fieldname}-${Date.now()}${extension}`;
+      `brand-${file.fieldname}-${Date.now()}${extension}`;
 
     cb(null, fileName);
   },
