@@ -202,15 +202,15 @@ const importBrands = async (req, res, next) => {
              :
              'https://pictures.grocerapps.com/lgthumb/'+brand_slider_image;
 
-            if(image){
+            if(image || brand_slider_image){
             // 1. Generate a unique filename to prevent overwriting
             const fileExtension = path.extname(new URL(completeImage).pathname) || '.jpg';
             const filename = `brand-${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}${fileExtension}`;
             
             // Define paths
-            const uploadDir = path.join(__dirname, '../src/uploads/brands');
+            const uploadDir = path.join(__dirname, '../uploads/brands');
             const absoluteDestinationPath = path.join(uploadDir, filename);
-            var relativeDatabasePath = `/brands/${filename}`; // Public URL path for your API
+            var relativeDatabasePath = `/uploads/brands/${filename}`; // Public URL path for your API
 
             // 2. Ensure directory exists 
             fs.mkdirSync(uploadDir, { recursive: true })
