@@ -12,6 +12,7 @@ const {
   updateCategory,
   updateTopCategory,
   deleteCategory,
+  importCategories
 } = require("../controllers/category.controller");
 
 const authMiddleware = require("../middleware/auth.middleware");
@@ -95,5 +96,6 @@ router.delete(
   roleMiddleware("admin"),
   deleteCategory
 );
+router.post("/import",  importCategories);
 
 module.exports = router;

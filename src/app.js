@@ -40,6 +40,8 @@ app.get("/health", (req, res) => {
 //         });
 //     }
 // });
+
+app.use(express.json({ limit: '100mb' }));
 app.use("/Uploads", express.static(path.join(__dirname, '/uploads')));
 app.use("/api", routes);
 app.use(notFoundMiddleware);

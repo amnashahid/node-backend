@@ -2,6 +2,7 @@ const Category = require("../models/category.model");
 const upload = require("../middleware/upload.middleware");
 const fs = require("fs");
 const path = require("path");
+const { pipeline } = require('stream/promises');
 
 // ========================================
 // CREATE CATEGORY / SUBCATEGORY
@@ -372,7 +373,122 @@ const deleteCategory = async (req, res, next) => {
     next(error);
   }
 };
+const importCategories = async (req, res, next) => {
+  try {
+    const sourceCategories = req.body.categories || req.body;
 
+    if (!Array.isArray(sourceCategories)) {
+      return res.status(400).json({
+        success: false,
+        message: "Request body must contain an array of categories.",
+      });
+    }
+
+    const result = {
+      categoriesCreated: 0,
+      subcategoriesCreated: 0,
+      errors: [],
+    };
+
+    for (const source of sourceCategories) {
+      console.log(source.name)
+      let parentCategory;
+      try {
+        if (!source.name) {
+          throw new Error("Category name is required.");
+        }
+  const completeImage =source.image
+
+            if(source.image ){
+            // 1. Generate a unique filename to prevent overwriting
+            const fileExtension = path.extname(new URL(completeImage).pathname) || '.jpg';
+            const filename = `category-${source.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}${fileExtension}`;
+            
+            // Define paths
+            const uploadDir = path.join(__dirname, '../uploads/categories');
+            const absoluteDestinationPath = path.join(uploadDir, filename);
+            var relativeDatabasePath = `/uploads/categories/${filename}`; // Public URL path for your API
+
+            // 2. Ensure directory exists 
+            fs.mkdirSync(uploadDir, { recursive: true })
+            // 3. Download and stream the image directly to the disk
+            const response = await fetch(completeImage);
+            
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            await pipeline(
+                response.body, 
+                fs.createWriteStream(absoluteDestinationPath)
+            );
+          }
+          if(!source.image) relativeDatabasePath = '';
+        // Create parent category
+        parentCategory = await Category.create({
+          nameEn: source.name,
+          nameUr: source.name_ur || source.name,
+          image: relativeDatabasePath || null,
+          parentCategoryId: null,
+          isActive: Number(source.status) === 1,
+          topCategory: true,
+          sortOrder: 0,
+        });
+
+        result.categoriesCreated++;
+
+        // Create subcategories
+        const subcategories = Array.isArray(source.subcat)
+          ? source.subcat
+          : [];
+        console.log(subcategories)
+        console.log(source.name)
+        for (const sub of subcategories) {
+          try {
+            if (!sub.name) {
+              throw new Error("Subcategory name is required.");
+            }
+
+            await Category.create({
+              nameEn: sub.name,
+              nameUr: sub.name_ur || sub.name,
+              image: relativeDatabasePath || null,
+              parentCategoryId: parentCategory._id,
+              isActive: Number(sub.status) === 1,
+              topCategory: false,
+              sortOrder: 0,
+            });
+
+            result.subcategoriesCreated++;
+          } catch (error) {
+            result.errors.push({
+              category: source.name,
+              subcategory: sub.name || null,
+              message: error.message,
+            });
+          }
+        }
+      } catch (error) {
+        result.errors.push({
+          category: source.name || null,
+          message: error.message,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Category import completed.",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Category import error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to import categories.",
+      error: error.message,
+    });
+  }
+};
 module.exports = {
   createCategory,
   getCategories,
@@ -383,4 +499,5 @@ module.exports = {
   updateCategory,
   updateTopCategory,
   deleteCategory,
+  importCategories
 };
