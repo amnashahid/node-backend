@@ -224,7 +224,7 @@ const importBrands = async (req, res, next) => {
                 fs.createWriteStream(absoluteDestinationPath)
             );
           }
-          if(!image) relativeDatabasePath = '';
+          if(!image && !brand_slider_image) relativeDatabasePath = '';
 
             // 4. Save parsed data and local image path to your database model
             const newBrand = new Brand({
