@@ -175,8 +175,8 @@ async function downloadImage(p, usedNames) {
     }
 
     const fileName = pickFileName(p, ext, usedNames);
-    const filePath = path.join(UPLOAD_DIR, fileName);
-
+    const filePath = path.join ( UPLOAD_DIR, fileName);
+ console.log("sss",filePath);
     const buf = Buffer.from(await res.arrayBuffer());
     await fs.promises.writeFile(filePath, buf);
 
