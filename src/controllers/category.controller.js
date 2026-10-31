@@ -447,6 +447,32 @@ const importCategories = async (req, res, next) => {
               throw new Error("Subcategory name is required.");
             }
 
+
+
+            
+            if(sub.image ){
+            // 1. Generate a unique filename to prevent overwriting
+            const fileExtension = path.extname(new URL(sub.image).pathname) || '.jpg';
+            const filename = `subcategory-${source.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}${fileExtension}`;
+            
+            // Define paths
+            const uploadDir = path.join(__dirname, '../uploads/categories');
+            const absoluteDestinationPath = path.join(uploadDir, filename);
+            var relativeDatabasePath = `/uploads/categories/${filename}`; // Public URL path for your API
+
+            // 2. Ensure directory exists 
+            fs.mkdirSync(uploadDir, { recursive: true })
+            // 3. Download and stream the image directly to the disk
+            const response = await fetch(sub.image);
+            
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            await pipeline(
+                response.body, 
+                fs.createWriteStream(absoluteDestinationPath)
+            );
+          }
+
             await Category.create({
               nameEn: sub.name,
               nameUr: sub.name_ur || sub.name,
