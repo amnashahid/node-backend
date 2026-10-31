@@ -1,0 +1,313 @@
+[
+  {
+    "id": 498,
+    "name": "Breakfast Essentials",
+    "subcat": [
+      { "id": 58, "name": "Eggs" },
+      { "id": 65, "name": "Bread & Bakery" },
+      { "id": 63, "name": "Cereals & Granolas" },
+      { "id": 521, "name": "Oats & Porridge" },
+      { "id": 503, "name": "Cakes & Rusks" },
+      { "id": 504, "name": "Baqarkhani & Pastries" },
+      { "id": 236, "name": "Jams & Marmalades" },
+      { "id": 178, "name": "Honey" },
+      { "id": 179, "name": "Spreads" },
+      { "id": 180, "name": "Syrups" },
+      { "id": 502, "name": "Breakfast Mixes" }
+    ]
+  },
+  {
+    "id": 17,
+    "name": "Milk & Dairy",
+    "subcat": [
+      { "id": 472, "name": "Fresh Milk" },
+      { "id": 59, "name": "UHT Milk" },
+      { "id": 500, "name": "Powdered Milk" },
+      { "id": 61, "name": "Butter" },
+      { "id": 499, "name": "Cream" },
+      { "id": 62, "name": "Cheese" },
+      { "id": 60, "name": "Yogurt & Lassi" },
+      { "id": 70, "name": "Flavoured Milk" },
+      { "id": 501, "name": "Other Milk" }
+    ]
+  },
+  {
+    "id": 1,
+    "name": "Fruits & Vegetables",
+    "subcat": [
+      { "id": 67, "name": "Fresh Vegetables" },
+      { "id": 222, "name": "Fresh Fruits" },
+      { "id": 473, "name": "Exotic Herbs & Veg." }
+    ]
+  },
+  {
+    "id": 226,
+    "name": "Meat & Seafood",
+    "subcat": [
+      { "id": 230, "name": "Chicken" },
+      { "id": 398, "name": "Fish & Sea Food" },
+      { "id": 227, "name": "Mutton" },
+      { "id": 229, "name": "Beef" }
+    ]
+  },
+  {
+    "id": 148,
+    "name": "Daal, Rice, Atta & Cheeni",
+    "subcat": [
+      { "id": 162, "name": "Daalain" },
+      { "id": 163, "name": "Rice" },
+      { "id": 164, "name": "Atta & Other Flours" },
+      { "id": 157, "name": "Salt" },
+      { "id": 158, "name": "White Sugar" },
+      { "id": 525, "name": "Brown Sugar" }
+    ]
+  },
+  {
+    "id": 146,
+    "name": "Edible Oils & Ghee",
+    "subcat": [
+      { "id": 151, "name": "Cooking Oil" },
+      { "id": 152, "name": "Canola Oil" },
+      { "id": 155, "name": "Desi & Banaspati Ghee" },
+      { "id": 181, "name": "Sunflower Oil" },
+      { "id": 154, "name": "Corn Oil" },
+      { "id": 153, "name": "Olive, Mustard & Other Oils" }
+    ]
+  },
+  {
+    "id": 545,
+    "name": "Spices & Herbs",
+    "subcat": [
+      { "id": 160, "name": "Spice Mixes" },
+      { "id": 156, "name": "Powdered Spices" },
+      { "id": 528, "name": "Whole Spices" },
+      { "id": 532, "name": "Dried Herbs" }
+    ]
+  },
+  {
+    "id": 149,
+    "name": "Sauces & Pastes",
+    "subcat": [
+      { "id": 168, "name": "Ketchup" },
+      { "id": 169, "name": "Chilli & Hot Sauces" },
+      { "id": 170, "name": "Mayonnaise" },
+      { "id": 161, "name": "Vinegar & Lemon Juice" },
+      { "id": 174, "name": "Achaar & Chutneys" },
+      { "id": 197, "name": "Cooking Pastes" },
+      { "id": 529, "name": "Salsa & Dips" },
+      { "id": 536, "name": "Chinese & Asian Sauces" },
+      { "id": 530, "name": "Pasta & Pizza Sauces" },
+      { "id": 531, "name": "Salad Dressings" }
+    ]
+  },
+  {
+    "id": 187,
+    "name": "Baking & Pantry",
+    "subcat": [
+      { "id": 41, "name": "Pasta & Seviyaan" },
+      { "id": 527, "name": "Baking Essentials" },
+      { "id": 189, "name": "Custard & Jellies" },
+      { "id": 195, "name": "Baking & Dessert Mixes" },
+      { "id": 237, "name": "Canned Food" },
+      { "id": 533, "name": "Chocolate & Cocoa" },
+      { "id": 211, "name": "Food Colors & Essences" },
+      { "id": 526, "name": "Baking Decoration" },
+      { "id": 167, "name": "Seasoning Cubes & Soups" }
+    ]
+  },
+  {
+    "id": 16,
+    "name": "Snacks & Munchies",
+    "subcat": [
+      { "id": 507, "name": "Instant Noodles" },
+      { "id": 42, "name": "Biscuits & Cookies" },
+      { "id": 43, "name": "Chips & Nimko" },
+      { "id": 44, "name": "Chocolates" },
+      { "id": 46, "name": "Candies & Jellies" },
+      { "id": 506, "name": "Chewing Gum" },
+      { "id": 511, "name": "Other Snacks" }
+    ]
+  },
+  {
+    "id": 15,
+    "name": "Tea, Cold Drinks & Juices",
+    "subcat": [
+      { "id": 72, "name": "Tea" },
+      { "id": 19, "name": "Sharbat & Squash" },
+      { "id": 21, "name": "Cold Drinks" },
+      { "id": 22, "name": "Juices" },
+      { "id": 20, "name": "Energy Drinks" },
+      { "id": 18, "name": "Mineral & Soda Water" },
+      { "id": 24, "name": "Instant Drinks" },
+      { "id": 23, "name": "Coffee" }
+    ]
+  },
+  {
+    "id": 364,
+    "name": "Dry Fruit & Nuts",
+    "subcat": [
+      { "id": 365, "name": "Dry Fruits" }
+    ]
+  },
+  {
+    "id": 212,
+    "name": "Frozen & Chilled",
+    "subcat": [
+      { "id": 370, "name": "French Fries Chips" },
+      { "id": 216, "name": "Parathay & Naan" },
+      { "id": 385, "name": "Sausages & Toppings" },
+      { "id": 384, "name": "Kabab & Kofta" },
+      { "id": 383, "name": "Burger Patties" },
+      { "id": 381, "name": "Nuggets & Snacks" },
+      { "id": 382, "name": "Samosa & Rolls" },
+      { "id": 246, "name": "Frozen Fruits & Vegetables" }
+    ]
+  },
+  {
+    "id": 551,
+    "name": "Home Needs",
+    "subcat": [
+      { "id": 549, "name": "Batteries" },
+      { "id": 471, "name": "Air Fresheners" },
+      { "id": 538, "name": "Crockery & Serveware" },
+      { "id": 553, "name": "Cleaning Tools" },
+      { "id": 458, "name": "Garbage Bags" }
+    ]
+  },
+  {
+    "id": 98,
+    "name": "Baby Care",
+    "subcat": [
+      { "id": 124, "name": "Baby Wipes" },
+      { "id": 113, "name": "Baby Diapers" },
+      { "id": 539, "name": "Baby Food & Milk" },
+      { "id": 130, "name": "Baby Bath" },
+      { "id": 128, "name": "Baby Skin Care" },
+      { "id": 142, "name": "Baby Oral Care" },
+      { "id": 438, "name": "Baby Feeding Essentials" },
+      { "id": 415, "name": "Baby Hygiene & Health" }
+    ]
+  },
+  {
+    "id": 479,
+    "name": "Cleaning Products & Repellents",
+    "subcat": [
+      {
+        "id": 454,
+        "name": "Kitchen Needs",
+        "subcat": [
+          { "id": 455, "name": "Scrub & Sponges" },
+          { "id": 456, "name": "Dishwashing Powders & Liquids" },
+          { "id": 457, "name": "Dishwashing Bars & Paste" },
+          { "id": 459, "name": "Kitchen Tools" }
+        ]
+      },
+      {
+        "id": 460,
+        "name": "Tissue Papers",
+        "subcat": [
+          { "id": 461, "name": "Face Tissues" },
+          { "id": 462, "name": "Kitchen Tissues" },
+          { "id": 463, "name": "Toilet Tissues" }
+        ]
+      },
+      {
+        "id": 465,
+        "name": "Cleaning Essentials",
+        "subcat": [
+          { "id": 467, "name": "Toilet Cleaners" },
+          { "id": 466, "name": "Surface Cleaners" },
+          { "id": 475, "name": "Kitchen, Glass & Drain Cleaners" },
+          { "id": 468, "name": "Disinfectants" },
+          { "id": 469, "name": "Furniture & Interior Cleaners" }
+        ]
+      },
+      {
+        "id": 451,
+        "name": "Insect & Pest Control",
+        "subcat": [
+          { "id": 452, "name": "Flying Insects Control" },
+          { "id": 453, "name": "Crawling Insects Control" }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 444,
+    "name": "Laundry Essentials",
+    "subcat": [
+      { "id": 445, "name": "Detergent" },
+      { "id": 450, "name": "Fabric Conditioners" },
+      { "id": 446, "name": "Liquid Detergents" },
+      { "id": 447, "name": "Starch" },
+      { "id": 449, "name": "Bleach & Stain Remover" }
+    ]
+  },
+  {
+    "id": 569,
+    "name": "Body & Hair Care",
+    "subcat": [
+      { "id": 107, "name": "Shampoo" },
+      { "id": 109, "name": "Conditioner" },
+      { "id": 125, "name": "Soaps" },
+      { "id": 126, "name": "Hand Wash" },
+      { "id": 127, "name": "Shower Gel" },
+      { "id": 278, "name": "Hair Color" },
+      { "id": 110, "name": "Hair Oil" },
+      { "id": 248, "name": "Hair Gel" }
+    ]
+  },
+  {
+    "id": 92,
+    "name": "Skin Care",
+    "subcat": [
+      { "id": 542, "name": "Makeup Remover" },
+      { "id": 114, "name": "Lotion & Cream" },
+      { "id": 541, "name": "Petroleum Jelly" },
+      { "id": 116, "name": "Face Wash & Scrubs" },
+      { "id": 379, "name": "Powders" }
+    ]
+  },
+  {
+    "id": 82,
+    "name": "Personal Care",
+    "subcat": [
+      { "id": 87, "name": "Feminine Care" },
+      { "id": 119, "name": "Oral Care" },
+      { "id": 88, "name": "Female Grooming" },
+      { "id": 90, "name": "Men Grooming" },
+      { "id": 241, "name": "Deo & Roll ons" },
+      { "id": 201, "name": "Shoe Care" }
+    ]
+  },
+  {
+    "id": 488,
+    "name": "Stationery Shop",
+    "subcat": [
+      { "id": 570, "name": "Writing" },
+      { "id": 534, "name": "Tape & Glue" },
+      { "id": 493, "name": "Notebooks & Papers" },
+      { "id": 495, "name": "Art & Crafts" },
+      { "id": 537, "name": "Party & Gifting Supplies" },
+      { "id": 573, "name": "Stationary Accessories" }
+    ]
+  },
+  {
+    "id": 218,
+    "name": "Health & Wellness",
+    "subcat": [
+      { "id": 220, "name": "Condoms & Lubricants" },
+      { "id": 508, "name": "Food Supplements" },
+      { "id": 509, "name": "First Aid" },
+      { "id": 219, "name": "Herbal & Health" },
+      { "id": 567, "name": "Face Masks" }
+    ]
+  },
+  {
+    "id": 224,
+    "name": "Pet Care",
+    "subcat": [
+      { "id": 225, "name": "Cat Food" }
+    ]
+  }
+]

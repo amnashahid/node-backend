@@ -24,6 +24,7 @@ const deliverySlotRoutes = require("./deliverySlot.routes");
 const deliveryChargeRoutes = require("./deliveryCharge.routes");
 const orderRoutes = require("./order.routes");
 const adRoutes = require("./ad.routes");
+const importRoutes = require("./importProducts-route");
 
 
 router.use("/auth",  authRoutes );
@@ -40,4 +41,5 @@ router.use("/delivery-slots", deliverySlotRoutes);
 router.use("/delivery-charges", deliveryChargeRoutes);
 router.use("/orders", orderRoutes);
 router.use("/ads", adRoutes);
+router.use("/import-products", importRoutes);
 module.exports = router;
