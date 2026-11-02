@@ -62,7 +62,7 @@ const createCategory = async (req, res, next) => {
       topCategory: topCategory === true || topCategory === "true",
       sortOrder:
         sortOrder !== undefined ? Number(sortOrder) : 0,
-      image: req.file ?  `/uploads/${req.file.filename}` : null,
+      image: req.file ?  `/uploads/categories/${req.file.filename}` : null,
     });
 
     await category.save();
@@ -277,7 +277,7 @@ const updateCategory = async (req, res, next) => {
     }
 
     if (req.file) {
-      category.image = `/uploads/${req.file.filename}`;
+      category.image = `/uploads/categories/${req.file.filename}`;
     }
 
     await category.save();

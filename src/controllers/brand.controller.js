@@ -74,7 +74,7 @@ const createBrand = async (req, res, next) => {
     }
 
     const imageUrl =
-      `/uploads/${req.file.filename}`;
+      `/uploads/brands/${req.file.filename}`;
 
     const brand = await Brand.create({
       name: name.trim(),
@@ -122,7 +122,7 @@ const updateBrand = async (req, res, next) => {
       deleteImage(brand.image);
 
       brand.image = 
-        `/uploads/${req.file.filename}`;
+        `/uploads/brands/${req.file.filename}`;
     }
 
     await brand.save();
