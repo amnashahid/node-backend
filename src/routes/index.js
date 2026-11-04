@@ -42,4 +42,7 @@ router.use("/delivery-charges", deliveryChargeRoutes);
 router.use("/orders", orderRoutes);
 router.use("/ads", adRoutes);
 router.use("/import-products", importRoutes);
+router.use("/goats", require("./goat.routes"));
+router.use("/breeding", require("./breeding.routes"));
+router.use("/expenses", require("./expense.routes"));
 module.exports = router;
