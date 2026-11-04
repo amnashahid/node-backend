@@ -232,7 +232,30 @@ exports.updateProfile = async (req, res, next) => {
 exports.getUsers = async (req, res, next) => {
   try {
     const users = await User.find({ isActive: true });
-    return res.json({ success: true, data: { users } });
+    const addresses = await Address.find({
+      userId: { $in: users.map((user) => user._id) },
+    }).sort({
+      isDefault: -1,
+      createdAt: 1,
+    });
+    const addressesByUser = new Map();
+
+    for (const address of addresses) {
+      const userId = address.userId.toString();
+      const userAddresses = addressesByUser.get(userId) || [];
+      userAddresses.push(serializeAddress(address));
+      addressesByUser.set(userId, userAddresses);
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        users: users.map((user) => ({
+          ...user.toObject(),
+          addresses: addressesByUser.get(user._id.toString()) || [],
+        })),
+      },
+    });
   } catch (error) {
     return next(error);
   }
