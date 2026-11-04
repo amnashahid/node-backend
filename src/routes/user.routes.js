@@ -5,6 +5,7 @@ const controller = require("../controllers/user.controller");
 const router = express.Router();
 
 
+router.get("/", authMiddleware, controller.getUsers);
 router.get("/me", authMiddleware, controller.getProfile);
 router.put("/me", authMiddleware, controller.updateProfile);
 router.get("/me/addresses", authMiddleware, controller.getAddresses);

@@ -229,7 +229,14 @@ exports.updateProfile = async (req, res, next) => {
     return next(error);
   }
 };
-
+exports.getUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({ isActive: true });
+    return res.json({ success: true, data: { users } });
+  } catch (error) {
+    return next(error);
+  }
+};
 exports.getAddresses = async (req, res, next) => {
   console.log("Fetching addresses");
   try {
