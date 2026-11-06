@@ -11,7 +11,6 @@ router.get("/",authenticate, controller.getPublicSettings);
 router.get(
   "/admin",
   authenticate,
-  requireAdmin,
   controller.getAdminSettings
 );
 
