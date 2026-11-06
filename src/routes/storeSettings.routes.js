@@ -1,16 +1,24 @@
-const express = require("express");
 
+const express = require("express");
 const router = express.Router();
 
-const {
-  getStoreSettings,
-  updateStoreSettings,
-} = require("../controllers/storeSettings.controller");
+const controller = require("../controllers/storeSettings.controller");
+const authenticate = require("../middleware/auth.middleware");
+const requireAdmin = require("../middleware/requireAdmin.middleware");
 
-// Get settings
-router.get("/", getStoreSettings);
+router.get("/",authenticate, controller.getPublicSettings);
 
-// Create / update settings
-router.put("/", updateStoreSettings);
+router.get(
+  "/admin",
+  authenticate,
+  controller.getAdminSettings
+);
+
+router.put(
+  "/admin",
+  authenticate,
+  requireAdmin,
+  controller.upsertSettings
+);
 
 module.exports = router;

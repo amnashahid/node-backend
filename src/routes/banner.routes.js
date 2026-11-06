@@ -23,6 +23,7 @@ router.get("/", getBanners);
 
 router.get(
   "/:id",
+  authMiddleware,
   getBannerById
 );
 

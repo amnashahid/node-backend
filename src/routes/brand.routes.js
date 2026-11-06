@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 
-const {createBrand, getBrands, updateBrand, deleteBrand} = require("../controllers/brand.controller");
+const {createBrand, getBrands, updateBrand, deleteBrand, importBrands} = require("../controllers/brand.controller");
 
 const authenticate = require("../middleware/auth.middleware");
 const authorize = require("../middleware/role.middleware");
@@ -20,29 +20,26 @@ router.get(
 
 router.post(
   "/",
-  authenticate,
-//   authorize("admin"),
+ authenticate,
+  authorize("admin"),
   uploadBrandImage.single("image"),
   createBrand
 );
 
-// router.get(
-//   "/:id",
-//   authenticate,
-//   brandController.getBrandById
-// );
 router.put(
   "/:id",
   authenticate,
- // authorize("admin"),
+ authorize("admin"),
   uploadBrandImage.single("image"),
   updateBrand
 );
 router.delete(
   "/:id",
   authenticate,
-  //authorize("admin"),
+  authorize("admin"),
   deleteBrand
 );
+router.post("/import",importBrands);
+
 
  module.exports = router;

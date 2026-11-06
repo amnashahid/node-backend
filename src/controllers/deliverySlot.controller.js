@@ -1,304 +1,181 @@
-
+const mongoose = require("mongoose");
 const DeliverySlot = require("../models/deliverySlot.model");
+const {
+  MAX_ADVANCE_DAYS,
+  getAvailableSlots,
+  getUpcomingSlots,
+} = require("../services/delivery.service");
 
-const DAYS = {
-  0: "Sunday",
-  1: "Monday",
-  2: "Tuesday",
-  3: "Wednesday",
-  4: "Thursday",
-  5: "Friday",
-  6: "Saturday",
-};
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const editableFields = [
+  "label",
+  "startTime",
+  "endTime",
+  "daysOfWeek",
+  "minLeadMinutes",
+  "sortOrder",
+  "isActive",
+];
 
-const isValidTime = (time) => {
-  if (typeof time !== "string") {
-    return false;
+function fail(res, message, status = 400) {
+  return res.status(status).json({ success: false, message });
+}
+
+function pick(body) {
+  return Object.fromEntries(
+    editableFields
+      .filter((field) => Object.prototype.hasOwnProperty.call(body, field))
+      .map((field) => [field, body[field]])
+  );
+}
+
+function validate(data) {
+  for (const field of ["startTime", "endTime"]) {
+    if (data[field] !== undefined && !TIME_PATTERN.test(data[field])) {
+      return `${field} must be in 24-hour HH:mm format.`;
+    }
   }
 
-  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(time);
-};
+  if (data.label !== undefined && typeof data.label !== "string") {
+    return "label must be a string.";
+  }
 
-const timeToMinutes = (time) => {
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return hours * 60 + minutes;
-};
-
-const validateSlot = (dayOfWeek, startTime, endTime) => {
   if (
-    dayOfWeek === undefined ||
-    dayOfWeek === null ||
-    dayOfWeek === ""
+    data.daysOfWeek !== undefined &&
+    (!Array.isArray(data.daysOfWeek) ||
+      data.daysOfWeek.length === 0 ||
+      !data.daysOfWeek.every((day) => Number.isInteger(day) && day >= 0 && day <= 6))
   ) {
-    return "Day of week is required";
+    return "daysOfWeek must be a non-empty array of numbers from 0 (Sunday) to 6 (Saturday).";
   }
 
-  const day = Number(dayOfWeek);
-
-  if (!Number.isInteger(day) || day < 0 || day > 6) {
-    return "Invalid day of week";
+  for (const field of ["minLeadMinutes", "sortOrder"]) {
+    if (
+      data[field] !== undefined &&
+      (typeof data[field] !== "number" ||
+        !Number.isFinite(data[field]) ||
+        (field === "minLeadMinutes" && data[field] < 0))
+    ) {
+      return `${field} must be a valid number${field === "minLeadMinutes" ? " of 0 or more" : ""}.`;
+    }
   }
 
-  if (!isValidTime(startTime)) {
-    return "Invalid start time. Use HH:mm format";
-  }
-
-  if (!isValidTime(endTime)) {
-    return "Invalid end time. Use HH:mm format";
-  }
-
-  const start = timeToMinutes(startTime);
-  const end = timeToMinutes(endTime);
-
-  if (end <= start) {
-    return "End time must be greater than start time";
+  if (data.isActive !== undefined && typeof data.isActive !== "boolean") {
+    return "isActive must be a boolean.";
   }
 
   return null;
-};
+}
 
-const checkOverlap = async (
-  dayOfWeek,
-  startTime,
-  endTime,
-  excludeId = null
-) => {
-  const start = timeToMinutes(startTime);
-  const end = timeToMinutes(endTime);
+function validateRange(startTime, endTime) {
+  return startTime < endTime ? null : "endTime must be later than startTime.";
+}
 
-  const slots = await DeliverySlot.find({
-    dayOfWeek: Number(dayOfWeek),
-    ...(excludeId
-      ? {
-          _id: {
-            $ne: excludeId,
-          },
-        }
-      : {}),
-  });
-
-  for (const slot of slots) {
-    const existingStart = timeToMinutes(slot.startTime);
-    const existingEnd = timeToMinutes(slot.endTime);
-
-    // Overlap condition:
-    // newStart < existingEnd && newEnd > existingStart
-
-    if (
-      start < existingEnd &&
-      end > existingStart
-    ) {
-      return slot;
-    }
-  }
-
-  return null;
-};
-
-// GET /api/delivery-slots
-const getDeliverySlots = async (req, res, next) => {
+// GET /api/delivery-slots/available?days=7
+exports.getAvailable = async (req, res, next) => {
   try {
-    const slots = await DeliverySlot.find()
-      .sort({
-        dayOfWeek: 1,
-        startTime: 1,
-      });
+    const days = req.query.days === undefined ? 7 : Number(req.query.days);
 
-    res.status(200).json({
-      success: true,
-      count: slots.length,
-      data: slots,
-    });
+    if (!Number.isInteger(days) || days < 1 || days > MAX_ADVANCE_DAYS) {
+      return fail(res, `days must be a whole number from 1 to ${MAX_ADVANCE_DAYS}.`);
+    }
+
+    return res.json({ success: true, data: await getAvailableSlots(days) });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-// GET /api/delivery-slots/day/:dayOfWeek
-const getDeliverySlotsByDay = async (req, res, next) => {
+// GET /api/delivery-slots/upcoming (today, tomorrow, day after tomorrow)
+exports.getUpcoming = async (req, res, next) => {
   try {
-    const dayOfWeek = Number(req.params.dayOfWeek);
-
-    if (
-      !Number.isInteger(dayOfWeek) ||
-      dayOfWeek < 0 ||
-      dayOfWeek > 6
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid day of week",
-      });
-    }
-
-    const slots = await DeliverySlot.find({
-      dayOfWeek,
-      isActive: true,
-    }).sort({
-      startTime: 1,
-    });
-
-    res.status(200).json({
-      success: true,
-      day: DAYS[dayOfWeek],
-      count: slots.length,
-      data: slots,
-    });
+    return res.json({ success: true, data: await getUpcomingSlots() });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-// POST /api/delivery-slots
-const createDeliverySlot = async (req, res, next) => {
+// GET /api/delivery-slots (admin: all slots)
+exports.getSlots = async (req, res, next) => {
   try {
-    const {
-      dayOfWeek,
-      startTime,
-      endTime,
-      isActive = true,
-    } = req.body;
+    const slots = await DeliverySlot.find().sort({ sortOrder: 1, startTime: 1 });
+    return res.json({ success: true, count: slots.length, data: slots });
+  } catch (error) {
+    return next(error);
+  }
+};
 
-    const validationError = validateSlot(
-      dayOfWeek,
-      startTime,
-      endTime
-    );
+exports.createSlot = async (req, res, next) => {
+  try {
+    const data = pick(req.body);
 
-    if (validationError) {
-      return res.status(400).json({
-        success: false,
-        message: validationError,
-      });
+    if (data.startTime === undefined || data.endTime === undefined) {
+      return fail(res, "startTime and endTime are required.");
     }
 
-    const overlappingSlot = await checkOverlap(
-      dayOfWeek,
-      startTime,
-      endTime
-    );
+    const message = validate(data) || validateRange(data.startTime, data.endTime);
+    if (message) return fail(res, message);
 
-    if (overlappingSlot) {
-      return res.status(400).json({
-        success: false,
-        message: `Delivery slot overlaps with ${overlappingSlot.startTime} - ${overlappingSlot.endTime}`,
-      });
-    }
-
-    const slot = await DeliverySlot.create({
-      dayOfWeek: Number(dayOfWeek),
-      startTime,
-      endTime,
-      isActive,
-    });
-
-    res.status(201).json({
+    const slot = await DeliverySlot.create(data);
+    return res.status(201).json({
       success: true,
-      message: "Delivery slot created successfully",
+      message: "Delivery slot created successfully.",
       data: slot,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-// PUT /api/delivery-slots/:id
-const updateDeliverySlot = async (req, res, next) => {
+exports.updateSlot = async (req, res, next) => {
   try {
-    const { id } = req.params;
-
-    const {
-      dayOfWeek,
-      startTime,
-      endTime,
-      isActive,
-    } = req.body;
-
-    const validationError = validateSlot(
-      dayOfWeek,
-      startTime,
-      endTime
-    );
-
-    if (validationError) {
-      return res.status(400).json({
-        success: false,
-        message: validationError,
-      });
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return fail(res, "Invalid delivery slot ID.");
     }
 
-    const slot = await DeliverySlot.findById(id);
-
-    if (!slot) {
-      return res.status(404).json({
-        success: false,
-        message: "Delivery slot not found",
-      });
+    const updates = pick(req.body);
+    if (Object.keys(updates).length === 0) {
+      return fail(res, "Provide at least one field to update.");
     }
 
-    const overlappingSlot = await checkOverlap(
-      dayOfWeek,
-      startTime,
-      endTime,
-      id
-    );
+    const slot = await DeliverySlot.findById(req.params.id);
+    if (!slot) return fail(res, "Delivery slot not found.", 404);
 
-    if (overlappingSlot) {
-      return res.status(400).json({
-        success: false,
-        message: `Delivery slot overlaps with ${overlappingSlot.startTime} - ${overlappingSlot.endTime}`,
-      });
-    }
+    const message =
+      validate(updates) ||
+      validateRange(
+        updates.startTime ?? slot.startTime,
+        updates.endTime ?? slot.endTime
+      );
+    if (message) return fail(res, message);
 
-    slot.dayOfWeek = Number(dayOfWeek);
-    slot.startTime = startTime;
-    slot.endTime = endTime;
-
-    if (typeof isActive === "boolean") {
-      slot.isActive = isActive;
-    }
-
+    Object.assign(slot, updates);
     await slot.save();
 
-    res.status(200).json({
+    return res.json({
       success: true,
-      message: "Delivery slot updated successfully",
+      message: "Delivery slot updated successfully.",
       data: slot,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-// DELETE /api/delivery-slots/:id
-const deleteDeliverySlot = async (req, res, next) => {
+exports.deleteSlot = async (req, res, next) => {
   try {
-    const { id } = req.params;
-
-    const slot = await DeliverySlot.findById(id);
-
-    if (!slot) {
-      return res.status(404).json({
-        success: false,
-        message: "Delivery slot not found",
-      });
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return fail(res, "Invalid delivery slot ID.");
     }
 
-    await DeliverySlot.findByIdAndDelete(id);
+    const slot = await DeliverySlot.findByIdAndDelete(req.params.id);
+    if (!slot) return fail(res, "Delivery slot not found.", 404);
 
-    res.status(200).json({
+    return res.json({
       success: true,
-      message: "Delivery slot deleted successfully",
+      message: "Delivery slot deleted successfully.",
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
-};
-
-module.exports = {
-  getDeliverySlots,
-  getDeliverySlotsByDay,
-  createDeliverySlot,
-  updateDeliverySlot,
-  deleteDeliverySlot,
 };

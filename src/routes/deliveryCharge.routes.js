@@ -1,58 +1,12 @@
 const express = require("express");
+const controller = require("../controllers/deliveryCharge.controller");
+const authenticate = require("../middleware/auth.middleware");
+const authorizeRoles = require("../middleware/role.middleware");
 
 const router = express.Router();
 
-const {
-  getDeliveryCharges,
-  getActiveDeliveryCharges,
-  getDeliveryCharge,
-  createDeliveryCharge,
-  updateDeliveryCharge,
-  deleteDeliveryCharge,
-  calculateDeliveryCharge,
-} = require("../controllers/deliveryCharge.controller");
-
-
-router.get(
-  "/",
-  getDeliveryCharges
-);
-
-
-router.get(
-  "/active",
-  getActiveDeliveryCharges
-);
-
-
-router.get(
-  "/calculate",
-  calculateDeliveryCharge
-);
-
-
-router.get(
-  "/:id",
-  getDeliveryCharge
-);
-
-
-router.post(
-  "/",
-  createDeliveryCharge
-);
-
-
-router.put(
-  "/:id",
-  updateDeliveryCharge
-);
-
-
-router.delete(
-  "/:id",
-  deleteDeliveryCharge
-);
-
+router.get("/",authenticate, controller.getConfig);
+router.post("/calculate", authenticate,controller.calculate);
+router.put("/", authenticate, authorizeRoles("admin"), controller.upsertConfig);
 
 module.exports = router;

@@ -60,6 +60,10 @@ const productSchema = new mongoose.Schema(
       ref: "Category",
       default: null,
     },
+    maxPurchaseLimit: {
+      type: Number,
+      default: null,
+    },
 
     brandId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -102,7 +106,7 @@ const productSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
+    timestamps: true,   
   }
 );
 

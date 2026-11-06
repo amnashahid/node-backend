@@ -1,1431 +1,674 @@
+
 const mongoose = require("mongoose");
 
 const Order = require("../models/order.model");
-const OrderItem = require("../models/orderItem.model");
-const OrderTimeline = require("../models/orderTimeline.model");
-const Product = require("../models/product.model");
-const Deal = require("../models/deal.model");
-const DeliverySlot = require("../models/deliverySlot.model");
-const User = require("../models/User");
+const OrderProductItem = require("../models/orderProductItem.model");
+const OrderDealItem = require("../models/orderDealItem.model");
+const OrderWorkflow = require("../models/orderWorkflow.model");
 
-// ============================================================
-// GENERATE ORDER NUMBER
-// ============================================================
+const STATUS_TEXT = {
+  pending: "Order Pending",
+  confirmed: "Order Confirmed",
+  preparing: "Order Preparing",
+  out_for_delivery: "Out for Delivery",
+  delivered: "Order Delivered",
+  cancelled: "Order Cancelled",
+};
 
-const generateOrderNumber = () => {
-  const timestamp = Date.now().toString();
-
-  const random = Math.floor(
-    1000 + Math.random() * 9000
-  );
+/**
+ * Generate order number
+ */
+function generateOrderNumber() {
+  const timestamp = Date.now();
+  const random = Math.floor(1000 + Math.random() * 9000);
 
   return `ORD-${timestamp}-${random}`;
-};
+}
 
-// ============================================================
-// SAFE NUMBER
-// ============================================================
-
-const toSafeNumber = (
-  value,
-  defaultValue = 0
-) => {
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return defaultValue;
-  }
-
-  return number;
-};
-
-// ============================================================
-// CREATE ORDER
-// ============================================================
-
-const createOrder = async (req, res, next) => {
+/**
+ * Create Order
+ *
+ * Creates:
+ * 1. Order
+ * 2. OrderProductItem records
+ * 3. OrderDealItem records
+ * 4. Initial OrderWorkflow record
+ */
+exports.createOrder = async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
-    const {
-      customerId,
-      addressId,
-      phone,
-      name,
-      deliverySlotId,
-      items,
-      total,
-      subTotal,
-      discount,
-      paymentMethod,
-      customerNotes,
-      deliveryCharges,
-    } = req.body;
-
-    console.log(req.body)
-
-    // ========================================================
-    // BASIC VALIDATION
-    // ========================================================
-
-    if (
-      !customerId ||
-      !mongoose.Types.ObjectId.isValid(customerId)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid customerId.",
-      });
-    }
-
-    if (
-      !addressId ||
-      !mongoose.Types.ObjectId.isValid(addressId)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid addressId.",
-      });
-    }
-
-    if (
-      !deliverySlotId ||
-      !mongoose.Types.ObjectId.isValid(
-        deliverySlotId
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid deliverySlotId.",
-      });
-    }
-
-    if (
-      !Array.isArray(items) ||
-      items.length === 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Order must contain at least one item.",
-      });
-    }
-
-    // ========================================================
-    // CUSTOMER
-    // ========================================================
-
-    const customer = await User.findOne({
-      _id: customerId,
-      isActive: true,
-    });
-
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message: "Customer not found or inactive.",
-      });
-    }
-
-    // ========================================================
-    // ADDRESS
-    // ========================================================
-
-    const selectedAddress =
-      customer.addresses?.find(
-        (address) =>
-          String(address._id) ===
-          String(addressId)
-      );
-
-    if (!selectedAddress) {
-      return res.status(404).json({
-        success: false,
-        message: "Selected address was not found.",
-      });
-    }
-
-    // ========================================================
-    // DELIVERY SLOT
-    // ========================================================
-
-    const deliverySlot =
-      await DeliverySlot.findOne({
-        _id: deliverySlotId,
-        isActive: true,
-      });
-
-    if (!deliverySlot) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Delivery slot not found or inactive.",
-      });
-    }
-
-    // ========================================================
-    // DELIVERY CHARGES
-    // ========================================================
-
-    const safeDeliveryCharges =
-      toSafeNumber(
-        deliveryCharges,
-        0
-      );
-
-    if (safeDeliveryCharges < 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Delivery charges cannot be negative.",
-      });
-    }
-
-    
-
-    // // ========================================================
-    // // PROCESS EACH ITEM
-    // // ========================================================
-
-    // for (const requestedItem of items) {
-    //   if (!requestedItem) {
-    //     return res.status(400).json({
-    //       success: false,
-    //       message: "Invalid order item.",
-    //     });
-    //   }
-
-    //   const {
-    //     productId,
-    //     quantity,
-    //     price,
-    //     dealId,
-    //   } = requestedItem;
-
-    //   // ------------------------------------------------------
-    //   // PRODUCT ID
-    //   // ------------------------------------------------------
-
-    //   if (
-    //     !productId ||
-    //     !mongoose.Types.ObjectId.isValid(
-    //       productId
-    //     )
-    //   ) {
-    //     return res.status(400).json({
-    //       success: false,
-    //       message: `Invalid productId: ${productId}`,
-    //     });
-    //   }
-
-    //   // ------------------------------------------------------
-    //   // QUANTITY
-    //   // ------------------------------------------------------
-
-    //   const itemQuantity =
-    //     Number(quantity);
-
-    //   if (
-    //     !Number.isFinite(itemQuantity) ||
-    //     itemQuantity < 1 ||
-    //     !Number.isInteger(itemQuantity)
-    //   ) {
-    //     return res.status(400).json({
-    //       success: false,
-    //       message: `Invalid quantity for product ${productId}.`,
-    //     });
-    //   }
-
-    //   // ------------------------------------------------------
-    //   // UNIT PRICE
-    //   // ------------------------------------------------------
-
-    //   const unitPrice =
-    //     Number(price);
-
-
-    //   if (
-    //     !Number.isFinite(unitPrice) ||
-    //     unitPrice < 0
-    //   ) {
-    //     return res.status(400).json({
-    //       success: false,
-    //       message:
-    //         `Invalid unit price for product ${productId}. ` +
-    //         `Received: ${price}`,
-    //     });
-    //   }
-
-    //   // ------------------------------------------------------
-    //   // PRODUCT
-    //   // ------------------------------------------------------
-
-    //   const product =
-    //     await Product.findOne({
-    //       _id: productId,
-    //       isActive: true,
-    //     });
-
-    //   if (!product) {
-    //     return res.status(404).json({
-    //       success: false,
-    //       message:
-    //         `Product ${productId} not found or inactive.`,
-    //     });
-    //   }
-
-    //   // ------------------------------------------------------
-    //   // ITEM TOTAL
-    //   // ------------------------------------------------------
-
-    //   const itemTotal =
-    //     unitPrice * itemQuantity;
-
-    //   if (
-    //     !Number.isFinite(itemTotal) ||
-    //     itemTotal < 0
-    //   ) {
-    //     return res.status(400).json({
-    //       success: false,
-    //       message:
-    //         `Unable to calculate total for product ${productId}.`,
-    //     });
-    //   }
-
-    //   // ======================================================
-    //   // NORMAL PRODUCT
-    //   // ======================================================
-
-    //   if (!dealId) {
-    //     const regularPrice =
-    //       toSafeNumber(
-    //         product.price,
-    //         unitPrice
-    //       );
-
-    //     // Calculate discount from the actual
-    //     // price being charged.
-    //     if (
-    //       regularPrice > unitPrice
-    //     ) {
-    //       discount +=
-    //         (regularPrice - unitPrice) *
-    //         itemQuantity;
-    //     }
-
-    //     orderItemsData.push({
-    //       productId:
-    //         product._id,
-
-    //       dealId: null,
-
-    //       quantity:
-    //         itemQuantity,
-
-    //       unitPrice,
-
-    //       totalPrice:
-    //         itemTotal,
-
-    //       dealPrice: null,
-    //     });
-
-    //     subtotal += itemTotal;
-
-    //     continue;
-    //   }
-
-    //   // ======================================================
-    //   // DEAL VALIDATION
-    //   // ======================================================
-
-    //   if (
-    //     !mongoose.Types.ObjectId.isValid(
-    //       dealId
-    //     )
-    //   ) {
-    //     return res.status(400).json({
-    //       success: false,
-    //       message:
-    //         `Invalid dealId: ${dealId}`,
-    //     });
-    //   }
-
-    //   const deal =
-    //     await Deal.findOne({
-    //       _id: dealId,
-    //       isActive: true,
-    //     });
-
-    //   if (!deal) {
-    //     return res.status(404).json({
-    //       success: false,
-    //       message:
-    //         `Deal ${dealId} not found or inactive.`,
-    //     });
-    //   }
-
-    //   // ------------------------------------------------------
-    //   // FIND PRODUCT INSIDE DEAL
-    //   // ------------------------------------------------------
-
-    //   let dealProduct = null;
-
-    //   if (Array.isArray(deal.products)) {
-    //     dealProduct =
-    //       deal.products.find(
-    //         (dealItem) =>
-    //           String(
-    //             dealItem.productId
-    //           ) ===
-    //           String(product._id)
-    //       );
-    //   }
-
-    //   if (!dealProduct) {
-    //     return res.status(400).json({
-    //       success: false,
-    //       message:
-    //         `Product ${productId} does not belong to deal ${dealId}.`,
-    //     });
-    //   }
-
-    //   // ------------------------------------------------------
-    //   // DEAL PRICE
-    //   // ------------------------------------------------------
-
-    //   const dealPrice =
-    //     toSafeNumber(
-    //       dealProduct.dealPrice ??
-    //         dealProduct.price ??
-    //         unitPrice,
-    //       unitPrice
-    //     );
-
-    //   if (
-    //     !Number.isFinite(dealPrice) ||
-    //     dealPrice < 0
-    //   ) {
-    //     return res.status(400).json({
-    //       success: false,
-    //       message:
-    //         `Invalid deal price for product ${productId}.`,
-    //     });
-    //   }
-
-    //   // ------------------------------------------------------
-    //   // DEAL DISCOUNT
-    //   // ------------------------------------------------------
-
-    //   const regularPrice =
-    //     toSafeNumber(
-    //       product.price,
-    //       unitPrice
-    //     );
-
-    //   if (
-    //     regularPrice > unitPrice
-    //   ) {
-    //     discount +=
-    //       (regularPrice - unitPrice) *
-    //       itemQuantity;
-    //   }
-
-    //   // ------------------------------------------------------
-    //   // ADD DEAL ITEM
-    //   // ------------------------------------------------------
-
-    //   orderItemsData.push({
-    //     productId:
-    //       product._id,
-
-    //     dealId:
-    //       deal._id,
-
-    //     quantity:
-    //       itemQuantity,
-
-    //     unitPrice,
-
-    //     totalPrice:
-    //       itemTotal,
-
-    //     dealPrice,
-    //   });
-
-    //   subtotal += itemTotal;
-    // }
-
-    // ========================================================
-    // NORMALIZE SUBTOTAL
-    // ========================================================
-
-    // subtotal = Number(
-    //   subtotal.toFixed(2)
-    // );
-
-    // discount = Number(
-    //   discount.toFixed(2)
-    // );
-
-    // ========================================================
-    // FINAL TOTAL
-    // ========================================================
-
-    // const calculatedTotal =
-    //   subtotal -
-    //   discount +
-    //   safeDeliveryCharges;
-
-    // const total = Number(
-    //   Math.max(
-    //     calculatedTotal,
-    //     0
-    //   ).toFixed(2)
-    // );
-
-    // ========================================================
-    // FINAL NUMBER VALIDATION
-    // ========================================================
-
-    // if (
-    //   !Number.isFinite(subtotal)
-    // ) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message:
-    //       "Invalid subtotal calculation.",
-    //   });
-    // }
-
-    if (
-      !Number.isFinite(discount)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid discount calculation.",
-      });
-    }
-
-    if (
-      !Number.isFinite(
-        safeDeliveryCharges
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid delivery charges.",
-      });
-    }
-
-    if (
-      !Number.isFinite(total)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid total calculation.",
-      });
-    }
-
-    // ========================================================
-    // START TRANSACTION
-    // ========================================================
-
     session.startTransaction();
 
-    // ========================================================
-    // CREATE ORDER
-    // ========================================================
+    const {
+      user,
+      products = [],
+      deals = [],
+      delivery,
+      subtotal,
+      deliveryCharge,
+      total,
+      paymentMethod = "COD",
+    } = req.body;
 
-    const orderNumber =
-      generateOrderNumber();
+    if (!user) {
+      await session.abortTransaction();
 
-
-
-
-    const order =
-      new Order({
-        orderNumber,
-
-        customerId,
-
-        addressId,
-
-        // Address snapshot
-        address: {
-          label:
-            selectedAddress.label ||
-            "",
-
-          recipientName: name,
-            //selectedAddress.recipientName,
-
-          phone: phone,
-
-          addressLine1:
-            selectedAddress.address,
-
-
-          area:
-            selectedAddress.area ||
-            "",
-
-          city:
-            selectedAddress.city ||
-            "",
-
-          postalCode:
-            selectedAddress.postalCode ||
-            "",
-
-          location:
-            selectedAddress.location ||
-            "",
-
-          latitude:
-            selectedAddress.latitude ??
-            null,
-
-          longitude:
-            selectedAddress.longitude ??
-            null,
-        },
-
-        // Delivery
-        deliveryDay:
-          deliverySlot.dayOfWeek,
-
-        deliverySlotId:
-          deliverySlot._id,
-
-        deliverySlot: {
-          startTime:
-            deliverySlot.startTime,
-
-          endTime:
-            deliverySlot.endTime,
-        },
-
-        status: "Pending",
-
-        paymentMethod:
-          paymentMethod ||
-          "Cash on Delivery",
-
-        paymentStatus: "Pending",
-
-        subTotal,
-
-        discount,
-        total,
-
-        deliveryCharges:
-          safeDeliveryCharges,
-
-        total,
-
-        customerNotes:
-          customerNotes || "",
-
-        cancellationReason: "",
+      return res.status(400).json({
+        success: false,
+        message: "User is required.",
       });
-
-    await order.save({
-      session,
-    });
-
-    // ========================================================
-    // CREATE ORDER ITEMS
-    // ========================================================
-    
-          let orderItems = [];
-    for (const requestedItem of items) {
-      if (!requestedItem) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid order item.",
-        });
-      }
-    orderItems.push({
-      orderId: order._id,
-      quantity: requestedItem.quantity,
-      unitPrice: requestedItem.unitPrice,
-      dealId: requestedItem.dealId,
-      dealPrice: requestedItem.dealPrice,
-      productId: requestedItem.productId,
-      totalPrice: requestedItem.quantity * requestedItem.unitPrice,
-    })
     }
 
-    await OrderItem.insertMany(
-      orderItems,
-      {
-        session,
-      }
-    );
+    if (
+      (!Array.isArray(products) || products.length === 0) &&
+      (!Array.isArray(deals) || deals.length === 0)
+    ) {
+      await session.abortTransaction();
 
-    // ========================================================
-    // CREATE INITIAL TIMELINE
-    // ========================================================
+      return res.status(400).json({
+        success: false,
+        message: "Order must contain at least one product or deal.",
+      });
+    }
 
-    await OrderTimeline.create(
+    if (!delivery) {
+      await session.abortTransaction();
+
+      return res.status(400).json({
+        success: false,
+        message: "Delivery information is required.",
+      });
+    }
+
+    const orderNumber = generateOrderNumber();
+
+    /**
+     * Create parent order
+     */
+    const order = await Order.create(
       [
         {
-          orderId:order._id,
+          orderNumber,
+          user,
 
-          status: "Pending",
+          delivery: {
+            address: delivery.address,
+            distanceKm: delivery.distanceKm,
+            slotId: delivery.slotId,
+            slotText: delivery.slotText,
+          },
 
-          note:
-            "Order placed successfully.",
+          subtotal,
+          deliveryCharge,
+          total,
+
+          status: "pending",
+          statusText: STATUS_TEXT.pending,
+
+          paymentStatus: "pending",
+          paymentMethod,
         },
       ],
-      {
-        session,
-      }
+      { session }
     );
 
-    // ========================================================
-    // COMMIT
-    // ========================================================
+    const createdOrder = order[0];
+
+    /**
+     * Create product items
+     */
+    const productItems = [];
+
+    if (Array.isArray(products)) {
+      for (const item of products) {
+        if (!item.product) {
+          throw new Error("Product ID is required.");
+        }
+
+        const quantity = Number(item.quantity);
+
+        const unitPrice = Number(item.unitPrice);
+
+        if (!quantity || quantity < 1) {
+          throw new Error("Product quantity must be at least 1.");
+        }
+
+        if (unitPrice < 0) {
+          throw new Error("Product price cannot be negative.");
+        }
+
+        productItems.push({
+          order: createdOrder._id,
+          product: item.product,
+
+          name: item.name,
+          image: item.image || "",
+
+          quantity,
+          unitPrice,
+
+          lineTotal:
+            item.lineTotal !== undefined
+              ? Number(item.lineTotal)
+              : quantity * unitPrice,
+        });
+      }
+    }
+
+    if (productItems.length > 0) {
+      await OrderProductItem.insertMany(productItems, {
+        session,
+      });
+    }
+
+    /**
+     * Create deal items
+     */
+    const dealItems = [];
+
+    if (Array.isArray(deals)) {
+      for (const item of deals) {
+        if (!item.deal) {
+          throw new Error("Deal ID is required.");
+        }
+
+        const quantity = Number(item.quantity);
+        const dealPrice = Number(item.dealPrice);
+
+        if (!quantity || quantity < 1) {
+          throw new Error("Deal quantity must be at least 1.");
+        }
+
+        if (dealPrice < 0) {
+          throw new Error("Deal price cannot be negative.");
+        }
+
+        const includedProducts = Array.isArray(item.products)
+          ? item.products.map((product) => ({
+              product: product.product,
+              name: product.name,
+              image: product.image || "",
+              quantity: Number(product.quantity),
+              unitPrice: Number(product.unitPrice),
+            }))
+          : [];
+
+        dealItems.push({
+          order: createdOrder._id,
+          deal: item.deal,
+
+          name: item.name,
+          image: item.image || "",
+
+          quantity,
+          dealPrice,
+
+          lineTotal:
+            item.lineTotal !== undefined
+              ? Number(item.lineTotal)
+              : quantity * dealPrice,
+
+          products: includedProducts,
+        });
+      }
+    }
+
+    if (dealItems.length > 0) {
+      await OrderDealItem.insertMany(dealItems, {
+        session,
+      });
+    }
+
+    /**
+     * Create initial workflow entry
+     */
+    await OrderWorkflow.create(
+      [
+        {
+          order: createdOrder._id,
+
+          fromStatus: "",
+
+          toStatus: "pending",
+
+          statusText: STATUS_TEXT.pending,
+
+          changedBy: req.user?._id || user,
+
+          note: "Order created.",
+
+          source: "customer",
+        },
+      ],
+      { session }
+    );
 
     await session.commitTransaction();
 
-    // ========================================================
-    // FETCH COMPLETE ORDER
-    // ========================================================
-
-    const createdOrder =
-      await Order.findById(
-        order._id
-      )
-        .populate(
-          "customerId",
-          "name email phone"
-        )
-        .populate(
-          "deliverySlotId"
-        )
-        .lean();
-
-    const createdOrderItems =
-      await OrderItem.find({
-        orderId:
-          order._id,
-      })
-        .populate(
-          "productId"
-        )
-        .populate(
-          "dealId"
-        )
-        .lean();
-
-    const timeline =
-      await OrderTimeline.find({
-        orderId:
-          order._id,
-      })
-        .sort({
-          createdAt: 1,
-        })
-        .lean();
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+    /**
+     * Return complete order
+     */
+    const result = await getCompleteOrder(createdOrder._id);
 
     return res.status(201).json({
       success: true,
-      message:
-        "Order created successfully.",
-      data: {
-        order:
-          createdOrder,
-
-        items:
-          createdOrderItems,
-
-        timeline,
-      },
+      message: "Order placed successfully.",
+      order: result,
     });
   } catch (error) {
-    // ========================================================
-    // ABORT TRANSACTION
-    // ========================================================
+    await session.abortTransaction();
 
-    if (
-      session.inTransaction()
-    ) {
-      await session.abortTransaction();
-    }
+    console.error("Create order error:", error);
 
-    console.error(
-      "CREATE ORDER ERROR:",
-      error
-    );
-
-    next(error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create order.",
+    });
   } finally {
-    await session.endSession();
+    session.endSession();
   }
 };
 
-// ============================================================
-// GET MY ORDERS
-// ============================================================
+/**
+ * Get complete order
+ */
+async function getCompleteOrder(orderId) {
+  const order = await Order.findById(orderId)
+    .populate("user", "firstName lastName phone email")
+    .lean();
 
-const getMyOrders = async (
-  req,
-  res,
-  next
-) => {
-  try {
-    const {
-      customerId,
-    } = req.params;
-
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        customerId
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid customerId.",
-      });
-    }
-
-    const orders =
-      await Order.find({
-        customerId,
-      })
-        .populate(
-          "deliverySlotId"
-        )
-        .sort({
-          createdAt: -1,
-        })
-        .lean();
-
-    const orderIds =
-      orders.map(
-        (order) => order._id
-      );
-
-    const orderItems =
-      await OrderItem.find({
-        orderId: {
-          $in: orderIds,
-        },
-      })
-        .populate(
-          "productId"
-        )
-        .populate(
-          "dealId"
-        )
-        .lean();
-
-    const timelines =
-      await OrderTimeline.find({
-        orderId: {
-          $in: orderIds,
-        },
-      })
-        .sort({
-          createdAt: 1,
-        })
-        .lean();
-
-    const data =
-      orders.map((order) => ({
-        ...order,
-
-        items:
-          orderItems.filter(
-            (item) =>
-              String(
-                item.orderId
-              ) ===
-              String(order._id)
-          ),
-
-        timeline:
-          timelines.filter(
-            (timeline) =>
-              String(
-                timeline.orderId
-              ) ===
-              String(order._id)
-          ),
-      }));
-
-    return res.status(200).json({
-      success: true,
-      count: data.length,
-      data,
-    });
-  } catch (error) {
-    next(error);
+  if (!order) {
+    return null;
   }
-};
 
-// ============================================================
-// GET MY ORDER BY ID
-// ============================================================
+  const [products, deals, workflow] = await Promise.all([
+    OrderProductItem.find({
+      order: orderId,
+    })
+      .populate("product")
+      .lean(),
 
-const getMyOrderById = async (
-  req,
-  res,
-  next
-) => {
+    OrderDealItem.find({
+      order: orderId,
+    })
+      .populate("deal")
+      .lean(),
+
+    OrderWorkflow.find({
+      order: orderId,
+    })
+      .populate("changedBy", "firstName lastName phone")
+      .sort({ createdAt: 1 })
+      .lean(),
+  ]);
+
+  return {
+    ...order,
+    productItems: products,
+    dealItems: deals,
+    workflow,
+  };
+}
+
+/**
+ * Get single order
+ */
+exports.getOrder = async (req, res) => {
   try {
-    const {
-      customerId,
-      orderId,
-    } = req.params;
+    //const { id } = req.user._id || req.user?.id || {}   ;
+    const id = req.params.id;
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        customerId
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid customerId.",
-      });
-    }
-
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        orderId
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid orderId.",
-      });
-    }
-
-    const order =
-      await Order.findOne({
-        _id: orderId,
-        customerId,
-      })
-        .populate(
-          "customerId",
-          "name email phone"
-        )
-        .populate(
-          "deliverySlotId"
-        )
-        .lean();
+    const order = await getCompleteOrder(id);
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message:
-          "Order not found.",
+        message: "Order not found.",
       });
     }
 
-    const items =
-      await OrderItem.find({
-        orderId:
-          order._id,
-      })
-        .populate(
-          "productId"
-        )
-        .populate(
-          "dealId"
-        )
-        .lean();
-
-    const timeline =
-      await OrderTimeline.find({
-        orderId:
-          order._id,
-      })
-        .sort({
-          createdAt: 1,
-        })
-        .lean();
-
-    return res.status(200).json({
+    return res.json({
       success: true,
-      data: {
-        order,
-        items,
-        timeline,
-      },
+      order,
     });
   } catch (error) {
-    next(error);
+    console.error("Get order error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get order.",
+    });
   }
 };
 
-// ============================================================
-// GET ALL ORDERS
-// ============================================================
-
-const getAllOrders = async (
-  req,
-  res,
-  next
-) => {
+/**
+ * Get orders for a user
+ */
+exports.getUserOrders = async (req, res) => {
   try {
-    const orders =
-      await Order.find()
-        .populate(
-          "customerId",
-          "name  phone"
-        )
-        .populate(
-          "deliverySlotId"
-        )
-        .sort({
-          createdAt: -1,
+    const userId = req.user?.userId;
+
+    const orders = await Order.find({
+      user: userId,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const result = [];
+
+    for (const order of orders) {
+      const [products, deals] = await Promise.all([
+        OrderProductItem.find({
+          order: order._id,
         })
-        .lean();
+          .populate("product")
+          .lean(),
 
-    const orderIds =
-      orders.map(
-        (order) => order._id
-      );
-
-    const items =
-      await OrderItem.find({
-        orderId: {
-          $in: orderIds,
-        },
-      })
-        .populate(
-          "productId"
-        )
-        .populate(
-          "dealId"
-        )
-        .lean();
-
-    const timelines =
-      await OrderTimeline.find({
-        orderId: {
-          $in: orderIds,
-        },
-      })
-        .sort({
-          createdAt: 1,
+        OrderDealItem.find({
+          order: order._id,
         })
-        .lean();
+          .populate("deal")
+          .lean(),
+      ]);
 
-    const data =
-      orders.map((order) => ({
+      result.push({
         ...order,
+        productItems: products,
+        dealItems: deals,
+      });
+    }
 
-        items:
-          items.filter(
-            (item) =>
-              String(
-                item.orderId
-              ) ===
-              String(order._id)
-          ),
-
-        timeline:
-          timelines.filter(
-            (timeline) =>
-              String(
-                timeline.orderId
-              ) ===
-              String(order._id)
-          ),
-      }));
-
-    return res.status(200).json({
+    return res.json({
       success: true,
-      count: data.length,
-      data,
+      orders: result,
     });
   } catch (error) {
-    next(error);
+    console.error("Get user orders error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get user orders.",
+    });
   }
 };
 
-// ============================================================
-// GET ORDER BY ID
-// ============================================================
-
-const getOrderById = async (
-  req,
-  res,
-  next
-) => {
+/**
+ * Get all orders
+ */
+exports.getOrders = async (req, res) => {
   try {
     const {
-      orderId,
-    } = req.params;
+      status,
+      page = 1,
+      limit = 20,
+    } = req.query;
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        orderId
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid orderId.",
-      });
+    const filter = {};
+
+    if (status) {
+      filter.status = status;
     }
 
-    const order =
-      await Order.findById(
-        orderId
-      )
-        .populate(
-          "customerId",
-          "name email phone"
-        )
-        .populate(
-          "deliverySlotId"
-        )
-        .lean();
+    const pageNumber = Math.max(Number(page), 1);
+    const limitNumber = Math.min(Math.max(Number(limit), 1), 100);
 
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Order not found.",
-      });
-    }
+    const skip = (pageNumber - 1) * limitNumber;
 
-    const items =
-      await OrderItem.find({
-        orderId:
-          order._id,
-      })
-        .populate(
-          "productId"
-        )
-        .populate(
-          "dealId"
-        )
-        .lean();
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
+        .populate("user", "firstName lastName phone email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNumber)
+        .lean(),
 
-    const timeline =
-      await OrderTimeline.find({
-        orderId:
-          order._id,
-      })
-        .sort({
-          createdAt: 1,
+      Order.countDocuments(filter),
+    ]);
+
+    const result = [];
+
+    for (const order of orders) {
+      const [products, deals] = await Promise.all([
+        OrderProductItem.find({
+          order: order._id,
         })
-        .lean();
+          .populate("product")
+          .lean(),
 
-    return res.status(200).json({
+        OrderDealItem.find({
+          order: order._id,
+        })
+          .populate("deal")
+          .lean(),
+      ]);
+
+      result.push({
+        ...order,
+        productItems: products,
+        dealItems: deals,
+      });
+    }
+
+    return res.json({
       success: true,
-      data: {
-        order,
-        items,
-        timeline,
+      orders: result,
+
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        pages: Math.ceil(total / limitNumber),
       },
     });
   } catch (error) {
-    next(error);
+    console.error("Get orders error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get orders.",
+    });
   }
 };
 
-// ============================================================
-// UPDATE ORDER STATUS
-// ============================================================
-
-const updateOrderStatus = async (
-  req,
-  res,
-  next
-) => {
-  const session =
-    await mongoose.startSession();
+/**
+ * Update order status
+ */
+exports.updateOrderStatus = async (req, res) => {
+  const session = await mongoose.startSession();
 
   try {
-    const {
-      orderId,
-    } = req.params;
+    session.startTransaction();
+
+    const id = req.params.id; // req.user?._id || req.user?.id;
 
     const {
       status,
-      note,
+      note = "",
+      source = "admin",
     } = req.body;
 
-    const allowedStatuses = [
-      "Pending",
-      "Confirmed",
-      "Preparing",
-      "Ready",
-      "Out for Delivery",
-      "Delivered",
-      "Cancelled",
-    ];
+    if (!status) {
+      await session.abortTransaction();
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        orderId
-      )
-    ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid orderId.",
+        message: "Status is required.",
       });
     }
 
-    if (
-      !allowedStatuses.includes(
-        status
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid order status.",
-      });
-    }
-
-    session.startTransaction();
-
-    const order =
-      await Order.findById(
-        orderId
-      ).session(session);
+    const order = await Order.findById(id).session(session);
 
     if (!order) {
       await session.abortTransaction();
 
       return res.status(404).json({
         success: false,
-        message:
-          "Order not found.",
+        message: "Order not found.",
       });
     }
 
-    order.status = status;
+    const oldStatus = order.status;
 
-    if (status === "Cancelled") {
-      order.cancellationReason =
-        note || "";
+    if (oldStatus === status) {
+      await session.abortTransaction();
+
+      return res.status(400).json({
+        success: false,
+        message: "Order already has this status.",
+      });
     }
 
-    await order.save({
-      session,
-    });
+    /**
+     * Update order
+     */
+    order.status = status;
+    order.statusText =
+      STATUS_TEXT[status] || status;
 
-    await OrderTimeline.create(
+    if (status === "delivered") {
+      order.deliveredAt = new Date();
+    }
+
+    if (status === "cancelled") {
+      order.cancelledAt = new Date();
+      order.cancellationReason = note;
+    }
+
+    await order.save({ session });
+
+    /**
+     * Add workflow history
+     */
+    await OrderWorkflow.create(
       [
         {
-          orderId:
-            order._id,
+          order: order._id,
 
-          status,
+          fromStatus: oldStatus,
 
-          note:
-            note ||
-            `Order status changed to ${status}.`,
+          toStatus: status,
+
+          statusText:
+            STATUS_TEXT[status] || status,
+
+          changedBy:
+            req.user?._id || null,
+
+          note,
+
+          source,
         },
       ],
-      {
-        session,
-      }
+      { session }
     );
 
     await session.commitTransaction();
 
-    return res.status(200).json({
+    const result = await getCompleteOrder(order._id);
+
+    return res.json({
       success: true,
-      message:
-        "Order status updated successfully.",
-      data: order,
+      message: "Order status updated successfully.",
+      order: result,
     });
   } catch (error) {
-    if (
-      session.inTransaction()
-    ) {
-      await session.abortTransaction();
-    }
+    await session.abortTransaction();
 
-    next(error);
+    console.error("Update order status error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update order status.",
+    });
   } finally {
-    await session.endSession();
+    session.endSession();
   }
 };
 
-// ============================================================
-// GET ORDER TIMELINE
-// ============================================================
-
-const getOrderTimeline = async (
-  req,
-  res,
-  next
-) => {
+/**
+ * Get order workflow/history
+ */
+exports.getOrderWorkflow = async (req, res) => {
   try {
-    const {
-      orderId,
-    } = req.params;
+    const userId = req.user?.userId || req.user?.id;
+const id = req.params.id;
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        orderId
-      )
-    ) {
-      return res.status(400).json({
+    const workflow = await OrderWorkflow.find({
+      order: id,
+    })
+      .populate("changedBy", "firstName lastName phone")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    return res.json({
+      success: true,
+      workflow,
+    });
+  } catch (error) {
+    console.error("Get workflow error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get order workflow.",
+    });
+  }
+};
+
+/**
+ * Get the authenticated user's latest order and its workflow
+ */
+exports.currentStatus = async (req, res) => {
+
+    console.log("Fetching current status for user:", req.user);
+    console.log("Fetching current status for user:", req.user?.userId || req.user?.id);
+  try {
+    // User ID comes from authentication middleware, not request parameters.
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({
         success: false,
-        message:
-          "Invalid orderId.",
+        message: "Authenticated user not found.",
       });
     }
 
-    const order =
-      await Order.findById(
-        orderId
-      );
+    console.log("User ID:", userId);
+    // Find the user's latest order.
+    const order = await Order.findOne({
+      user: userId,
+    })
+      .sort({ createdAt: -1})
+      .lean();
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message:
-          "Order not found.",
+        message: "You don't have any orders yet.",
+        order: null,
+        workflow: [],
       });
     }
 
-    const timeline =
-      await OrderTimeline.find({
-        orderId,
-      }).sort({
-        createdAt: 1,
-      });
+    // Fetch the latest order's workflow.
+    const workflow = await OrderWorkflow.find({
+      order: order._id,
+    })
+      .sort({ createdAt: -1, _id    : -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
-      count: timeline.length,
-      data: timeline,
+      message: "Current order status retrieved successfully.",
+      order,
+      workflow,
     });
   } catch (error) {
-    next(error);
-  }
-};
+    console.error("Get current order status error:", error);
 
-// ============================================================
-// DELETE ORDER
-// ============================================================
-
-const deleteOrder = async (
-  req,
-  res,
-  next
-) => {
-  const session =
-    await mongoose.startSession();
-
-  try {
-    const {
-      orderId,
-    } = req.params;
-
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        orderId
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid orderId.",
-      });
-    }
-
-    session.startTransaction();
-
-    const order =
-      await Order.findById(
-        orderId
-      ).session(session);
-
-    if (!order) {
-      await session.abortTransaction();
-
-      return res.status(404).json({
-        success: false,
-        message:
-          "Order not found.",
-      });
-    }
-
-    await OrderItem.deleteMany(
-      {
-        orderId:
-          order._id,
-      },
-      {
-        session,
-      }
-    );
-
-    await OrderTimeline.deleteMany(
-      {
-        orderId:
-          order._id,
-      },
-      {
-        session,
-      }
-    );
-
-    await Order.deleteOne(
-      {
-        _id:
-          order._id,
-      },
-      {
-        session,
-      }
-    );
-
-    await session.commitTransaction();
-
-    return res.status(200).json({
-      success: true,
-      message:
-        "Order deleted successfully.",
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get current order status.",
     });
-  } catch (error) {
-    if (
-      session.inTransaction()
-    ) {
-      await session.abortTransaction();
-    }
-
-    next(error);
-  } finally {
-    await session.endSession();
   }
-};
-
-// ============================================================
-// EXPORTS
-// ============================================================
-
-module.exports = {
-  createOrder,
-  getMyOrders,
-  getMyOrderById,
-  getAllOrders,
-  getOrderById,
-  updateOrderStatus,
-  getOrderTimeline,
-  deleteOrder,
 };

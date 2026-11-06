@@ -2,88 +2,62 @@ const express = require("express");
 
 const router = express.Router();
 
-const {
-  createOrder,
-  getMyOrders,
-  getMyOrderById,
-  getAllOrders,
-  getOrderById,
-  updateOrderStatus,
-  getOrderTimeline,
-  deleteOrder,
-} = require("../controllers/order.controller");
-
-const authMiddleware = require("../middleware/auth.middleware");
-const roleMiddleware = require("../middleware/role.middleware");
-
-// ============================================================
-// CUSTOMER
-// ============================================================
+const authenticate = require("../middleware/auth.middleware");
+const orderController = require("../controllers/order.controller");
 
 // Create order
 router.post(
   "/",
-  authMiddleware,
-  createOrder
+  authenticate,
+  orderController.createOrder
 );
-
-// Get logged-in customer's orders
-router.get(
-  "/my",
-  authMiddleware,
-  getMyOrders
-);
-
-// Get logged-in customer's order
-router.get(
-  "/my/:id",
-  authMiddleware,
-  getMyOrderById
-);
-
-// ============================================================
-// ADMIN
-// ============================================================
 
 // Get all orders
 router.get(
   "/",
-  authMiddleware,
-  roleMiddleware("admin"),
-  getAllOrders
+  authenticate,
+  orderController.getOrders
 );
 
-// Get order details
+// Get user's orders
 router.get(
-  "/:orderId",
-  authMiddleware,
-  roleMiddleware("admin"),
-  getOrderById
+  "/user-orders",
+  authenticate,
+  orderController.getUserOrders
+);
+
+// Get current/latest order status for authenticated user
+// IMPORTANT: This must be BEFORE /:id
+router.get(
+  "/current-status",
+  authenticate,
+  orderController.currentStatus
+);
+
+// Get single complete order
+router.get(
+  "/:id",
+  authenticate,
+  orderController.getOrder
+);
+
+// Get order status history
+router.get(
+  "/:id/workflow",
+  authenticate,
+  orderController.getOrderWorkflow
 );
 
 // Update order status
 router.put(
-  "/:orderId/status",
-  authMiddleware,
-  roleMiddleware("admin"),
-  updateOrderStatus
+  "/:id/status",
+  authenticate,
+  orderController.updateOrderStatus
 );
-
-// Get timeline
 router.get(
-  "/:orderId/timeline",
-  authMiddleware,
-  roleMiddleware("admin"),
-  getOrderTimeline
+  "/current-status",
+  authenticate,
+  orderController.currentStatus
 );
-
-// Delete order
-router.delete(
-  "/:id",
-  authMiddleware,
-  roleMiddleware("admin"),
-  deleteOrder
-);
-
 
 module.exports = router;

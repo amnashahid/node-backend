@@ -4,7 +4,6 @@ const cors = require("cors");
 const morgan = require("morgan");
 const routes = require("./routes");
 const app = express();
-const categoryRoutes = require("./routes/category.routes");
 
 app.use(cors());
 //app.use(helmet());
@@ -27,8 +26,23 @@ app.get("/health", (req, res) => {
     message: "E-Commerce API is running"
   });
 });
+// app.get("/api/server-ip", async (req, res) => {
+//     try {
+//         const response = await fetch("https://api.ipify.org?format=json");
+//         const data = await response.json();
 
-app.use("/Uploads", express.static(path.join(__dirname, '/uploads')));
+//         res.json({
+//             ip: data.ip
+//         });
+//     } catch (error) {
+//         res.status(500).json({
+//             error: error.message
+//         });
+//     }
+// });
+
+app.use(express.json({ limit: '100mb' }));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api", routes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

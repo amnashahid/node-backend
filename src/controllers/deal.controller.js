@@ -1,240 +1,324 @@
+const mongoose = require("mongoose");
 const Deal = require("../models/deal.model");
 const Product = require("../models/product.model");
 
-const createDeal = async (req, res, next) => {
+const imageUrl = (filename) => `/Uploads/deals/${filename}`;
+
+function parseProducts(value) {
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  return Array.isArray(value) ? value : null;
+}
+
+function parseDate(value) {
+  if (typeof value !== "string" && !(value instanceof Date)) {
+    return null;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseBoolean(value, fallback) {
+  if (value === undefined) return fallback;
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return null;
+}
+
+async function validateProducts(products) {
+  if (!products || products.length === 0) {
+    return { error: "At least one product and deal price are required." };
+  }
+
+  const ids = [];
+  const seenIds = new Set();
+
+  for (const item of products) {
+    if (
+      !item ||
+      !mongoose.isValidObjectId(item.productId) ||
+      item.price === undefined ||
+      item.price === null ||
+      item.price === "" ||
+      !Number.isFinite(Number(item.price)) ||
+      Number(item.price) < 0
+    ) {
+      return {
+        error: "Each product must have a valid productId and non-negative price.",
+      };
+    }
+
+    const productId = item.productId.toString();
+    if (seenIds.has(productId)) {
+      return { error: "A product can only be added once to a deal." };
+    }
+    seenIds.add(productId);
+    ids.push(productId);
+  }
+
+  const foundCount = await Product.countDocuments({ _id: { $in: ids } });
+  if (foundCount !== ids.length) {
+    return { error: "One or more products were not found." };
+  }
+
+  return {
+    products: products.map((item) => ({
+      productId: item.productId,
+      price: Number(item.price),
+    })),
+  };
+}
+
+function buildDateRange(startDate, endDate) {
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
+
+  if (!start || !end) {
+    return { error: "Valid startDate and endDate are required." };
+  }
+
+  if (start >= end) {
+    return { error: "startDate must be earlier than endDate." };
+  }
+
+  return { startDate: start, endDate: end };
+}
+
+exports.createDeal = async (req, res, next) => {
   try {
-    const {
-      nameEn,
-      nameUr,
-      description,
-      products,
-      isActive,
-      startDate,
-      endDate,
-      sortOrder,
-    } = req.body;
+    const { name, description, startDate, endDate } = req.body;
+    const products = parseProducts(req.body.products);
+    const isActive = parseBoolean(req.body.isActive, true);
 
-    if (!nameEn || !nameUr) {
+    if (typeof name !== "string" || !name.trim()) {
       return res.status(400).json({
         success: false,
-        message: "English and Urdu deal names are required",
+        message: "Deal name is required.",
       });
     }
 
-    if (!products || !Array.isArray(products) || products.length === 0) {
+    if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "At least one product is required",
+        message: "Deal image is required.",
       });
     }
 
-    // Validate products
-    const productIds = products.map((p) => p.productId);
-
-    const existingProducts = await Product.find({
-      _id: { $in: productIds },
-    });
-
-    if (existingProducts.length !== productIds.length) {
+    if (typeof req.body.isActive !== "undefined" && isActive === null) {
       return res.status(400).json({
         success: false,
-        message: "One or more products are invalid",
+        message: "isActive must be a boolean.",
+      });
+    }
+
+    const dateRange = buildDateRange(startDate, endDate);
+    if (dateRange.error) {
+      return res.status(400).json({ success: false, message: dateRange.error });
+    }
+
+    const productResult = await validateProducts(products);
+    if (productResult.error) {
+      return res.status(400).json({
+        success: false,
+        message: productResult.error,
       });
     }
 
     const deal = await Deal.create({
-      nameEn,
-      nameUr,
-      description: description || "",
-      image: req.file
-        ? `/images/deals/${req.file.filename}`
-        : "",
-
-      products: products.map((p) => ({
-        productId: p.productId,
-        quantity: Number(p.quantity) || 1,
-        dealPrice: Number(p.dealPrice) || 0,
-      })),
-
-      isActive:
-        isActive === undefined ? true : isActive === "true" || isActive === true,
-
-      startDate: startDate || null,
-      endDate: endDate || null,
-      sortOrder: Number(sortOrder) || 0,
+      name: name.trim(),
+      description: typeof description === "string" ? description.trim() : "",
+      image: imageUrl(req.file.filename),
+      ...dateRange,
+      products: productResult.products,
+      isActive,
     });
-
-    const result = await Deal.findById(deal._id).populate(
-      "products.productId"
-    );
 
     return res.status(201).json({
       success: true,
-      message: "Deal created successfully",
-      data: result,
+      message: "Deal created successfully.",
+      data: deal,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-const getDeals = async (req, res, next) => {
+exports.getDeals = async (req, res, next) => {
   try {
     const filter = {};
 
     if (req.query.isActive !== undefined) {
+      if (!["true", "false"].includes(req.query.isActive)) {
+        return res.status(400).json({
+          success: false,
+          message: "isActive query must be true or false.",
+        });
+      }
       filter.isActive = req.query.isActive === "true";
     }
 
     const deals = await Deal.find(filter)
-      .populate("products.productId")
-      .sort({ sortOrder: 1, createdAt: -1 });
+      .populate("products.productId", "nameEn nameUr image price salePrice")
+      .sort({ startDate: 1, createdAt: -1 });
 
-    res.json({
+    return res.json({
       success: true,
+      count: deals.length,
       data: deals,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-const getDealById = async (req, res, next) => {
+exports.getDealById = async (req, res, next) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid deal ID.",
+      });
+    }
+
     const deal = await Deal.findById(req.params.id).populate(
-      "products.productId"
+      "products.productId",
+      "nameEn nameUr image price salePrice"
     );
 
     if (!deal) {
       return res.status(404).json({
         success: false,
-        message: "Deal not found",
+        message: "Deal not found.",
       });
     }
 
-    res.json({
-      success: true,
-      data: deal,
-    });
+    return res.json({ success: true, data: deal });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-const updateDeal = async (req, res, next) => {
+exports.updateDeal = async (req, res, next) => {
   try {
-    const deal = await Deal.findById(req.params.id);
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid deal ID.",
+      });
+    }
 
+    const deal = await Deal.findById(req.params.id);
     if (!deal) {
       return res.status(404).json({
         success: false,
-        message: "Deal not found",
+        message: "Deal not found.",
       });
     }
 
-    const {
-      nameEn,
-      nameUr,
-      description,
-      products,
-      isActive,
-      startDate,
-      endDate,
-      sortOrder,
-    } = req.body;
-
-    if (!nameEn || !nameUr) {
-      return res.status(400).json({
-        success: false,
-        message: "English and Urdu deal names are required",
-      });
+    const { name, description, startDate, endDate } = req.body;
+    if (name !== undefined) {
+      if (typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Deal name must be a non-empty string.",
+        });
+      }
+      deal.name = name.trim();
     }
 
-    if (!products || !Array.isArray(products) || products.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one product is required",
-      });
+    if (description !== undefined) {
+      if (typeof description !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Description must be a string.",
+        });
+      }
+      deal.description = description.trim();
     }
 
-    const productIds = products.map((p) => p.productId);
-
-    const existingProducts = await Product.find({
-      _id: { $in: productIds },
-    });
-
-    if (existingProducts.length !== productIds.length) {
-      return res.status(400).json({
-        success: false,
-        message: "One or more products are invalid",
-      });
+    if (startDate !== undefined || endDate !== undefined) {
+      const dateRange = buildDateRange(
+        startDate === undefined ? deal.startDate : startDate,
+        endDate === undefined ? deal.endDate : endDate
+      );
+      if (dateRange.error) {
+        return res.status(400).json({
+          success: false,
+          message: dateRange.error,
+        });
+      }
+      deal.startDate = dateRange.startDate;
+      deal.endDate = dateRange.endDate;
     }
 
-    deal.nameEn = nameEn;
-    deal.nameUr = nameUr;
-    deal.description = description || "";
+    if (req.body.products !== undefined) {
+      const products = parseProducts(req.body.products);
+      const productResult = await validateProducts(products);
+      if (productResult.error) {
+        return res.status(400).json({
+          success: false,
+          message: productResult.error,
+        });
+      }
+      deal.products = productResult.products;
+    }
 
-    deal.products = products.map((p) => ({
-      productId: p.productId,
-      quantity: Number(p.quantity) || 1,
-      dealPrice: Number(p.dealPrice) || 0,
-    }));
+    if (req.body.isActive !== undefined) {
+      const isActive = parseBoolean(req.body.isActive);
+      if (isActive === null) {
+        return res.status(400).json({
+          success: false,
+          message: "isActive must be a boolean.",
+        });
+      }
+      deal.isActive = isActive;
+    }
 
     if (req.file) {
-      deal.image = `/images/deals/${req.file.filename}`;
+      deal.image = imageUrl(req.file.filename);
     }
-
-    deal.isActive =
-      isActive === undefined
-        ? deal.isActive
-        : isActive === "true" || isActive === true;
-
-    deal.startDate = startDate || null;
-    deal.endDate = endDate || null;
-    deal.sortOrder = Number(sortOrder) || 0;
 
     await deal.save();
 
-    const result = await Deal.findById(deal._id).populate(
-      "products.productId"
-    );
-
-    res.json({
+    return res.json({
       success: true,
-      message: "Deal updated successfully",
-      data: result,
+      message: "Deal updated successfully.",
+      data: deal,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-const deleteDeal = async (req, res, next) => {
+exports.deleteDeal = async (req, res, next) => {
   try {
-    const deal = await Deal.findById(req.params.id);
-
-    if (!deal) {
-      return res.status(404).json({
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({
         success: false,
-        message: "Deal not found",
+        message: "Invalid deal ID.",
       });
     }
 
-    await Deal.findByIdAndDelete(req.params.id);
+    const deal = await Deal.findByIdAndDelete(req.params.id);
+    if (!deal) {
+      return res.status(404).json({
+        success: false,
+        message: "Deal not found.",
+      });
+    }
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Deal deleted successfully",
+      message: "Deal deleted successfully.",
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
-};
-
-module.exports = {
-  createDeal,
-  getDeals,
-  getDealById,
-  updateDeal,
-  deleteDeal,
 };

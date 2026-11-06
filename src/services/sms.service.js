@@ -1,17 +1,23 @@
-// src/services/sms.service.js
+async function sendOtpSms(phone, otp) {
+  if (process.env.OTP_DEBUG === "true") {
+    console.log(`[DEV ONLY] OTP for ${phone}: ${otp}`);
+    return;
+  }
 
-const sendSms = async (phone, message) => {
+  const url = process.env.VEEVO_SMS_URL;
+  
+  var data = {
+  "apikey": process.env.VEEVO_HASH,
+  "receivernum": phone,
+  "sendernum": "Default",
+  "textmessage": process.env.OTP_MESSAGE.replace("[OTP]", otp)
+  };
 
-    // TODO:
-    // Connect your SMS provider here.
+  var response = await fetch(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
-    console.log("SMS");
-    console.log("To:", phone);
-    console.log("Message:", message);
-
-    return true;
-};
-
-module.exports = {
-    sendSms
-};
+module.exports = { sendOtpSms };

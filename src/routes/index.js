@@ -10,35 +10,39 @@ router.get("/", (req, res) => {
 });
 
 
-//AUTH
 
 const authRoutes =  require("./auth.routes");
 const brandRoutes = require("./brand.routes");
 const categoryRoutes = require("./category.routes");
+const storeSettingsRoutes = require("./storeSettings.routes");
 const productRoutes = require("./product.routes");
 const bannerRoutes = require("./banner.routes");
-const dealRoutes = require("./deal.routes");
 const userRoutes = require("./user.routes");
-const storeSettingsRoutes = require("./storeSettings.routes");
-const deliveryChargeRoutes = require("./deliveryCharge.routes");
+const dealRoutes = require("./deal.routes");
+const sectionRoutes = require("./section.routes");
 const deliverySlotRoutes = require("./deliverySlot.routes");
-const addressRoutes = require("./address.routes");
+const deliveryChargeRoutes = require("./deliveryCharge.routes");
 const orderRoutes = require("./order.routes");
-const promoCodeRoutes = require("./promoCode.routes");
+const adRoutes = require("./ad.routes");
+const importRoutes = require("./importProducts-route");
+
+
 router.use("/auth",  authRoutes );
+
 router.use("/brands", brandRoutes);
+router.use("/store-settings", storeSettingsRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/products", productRoutes);
 router.use("/banners", bannerRoutes);
-router.use("/deals", dealRoutes);
 router.use("/users", userRoutes);
-router.use("/store-settings", storeSettingsRoutes);
-router.use("/delivery-charges", deliveryChargeRoutes);
+router.use("/deals", dealRoutes);
+router.use("/sections", sectionRoutes);
 router.use("/delivery-slots", deliverySlotRoutes);
-router.use("/addresses", addressRoutes);
+router.use("/delivery-charges", deliveryChargeRoutes);
 router.use("/orders", orderRoutes);
-router.use("/sections", require("./section.routes"));
-router.use("/promo-codes", promoCodeRoutes);
-
-  
+router.use("/ads", adRoutes);
+router.use("/import-products", importRoutes);
+router.use("/goats", require("./goat.routes"));
+router.use("/breeding", require("./breeding.routes"));
+router.use("/expenses", require("./expense.routes"));
 module.exports = router;

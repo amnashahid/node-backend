@@ -1,4 +1,5 @@
 const Brand = require("../models/brand.model");
+const { pipeline } = require('stream/promises');
 
 const upload = require("../middleware/upload.middleware");
 const fs = require("fs");
@@ -8,7 +9,7 @@ const getBrands = async (req, res, next) => {
     const brands = await Brand.find({
       isActive: true,
     }).sort({
-      "name.en": 1,
+      "name": 1,
     });
 
     res.status(200).json({
@@ -42,9 +43,9 @@ const getBrands = async (req, res, next) => {
 // };
 const createBrand = async (req, res, next) => {
   try {
-    const { nameEn, nameUr } = req.body;
+    const { name, isTop } = req.body;
 
-    if (!nameEn || !nameUr) {
+    if (!name) {
       return res.status(400).json({
         success: false,
         message: "English and Urdu brand names are required",
@@ -60,8 +61,8 @@ const createBrand = async (req, res, next) => {
 
     const existingBrand = await Brand.findOne({
       $or: [
-        { "name.en": nameEn.trim() },
-        { "name.ur": nameUr.trim() },
+        { "name.en": name.trim() },
+        { "name.ur": name.trim() },
       ],
     });
 
@@ -73,14 +74,12 @@ const createBrand = async (req, res, next) => {
     }
 
     const imageUrl =
-      `/uploads/${req.file.filename}`;
+      `/uploads/brands/${req.file.filename}`;
 
     const brand = await Brand.create({
-      name: {
-        en: nameEn.trim(),
-        ur: nameUr.trim(),
-      },
+      name: name.trim(),
       image: imageUrl,
+      isTop: isTop === "true" || isTop === true,
     });
 
     res.status(201).json({
@@ -95,7 +94,7 @@ const createBrand = async (req, res, next) => {
 
 const updateBrand = async (req, res, next) => {
   try {
-    const { nameEn, nameUr, isActive } = req.body;
+    const { name, isTop, isActive } = req.body;
 
     const brand = await Brand.findById(req.params.id);
 
@@ -106,25 +105,24 @@ const updateBrand = async (req, res, next) => {
       });
     }
 
-    if (nameEn) {
-      brand.name.en = nameEn.trim();
-    }
-
-    if (nameUr) {
-      brand.name.ur = nameUr.trim();
-    }
+      brand.name = name.trim();
 
     if (isActive !== undefined) {
       brand.isActive =
         isActive === "true" || isActive === true;
     }
 
+    if (isTop !== undefined) {
+      brand.isTop =
+        isTop === "true" || isTop === true;
+    }           
+
     // Replace image if a new one was uploaded
     if (req.file) {
       deleteImage(brand.image);
 
-      brand.image =
-        `/uploads/${req.file.filename}`;
+      brand.image = 
+        `/uploads/brands/${req.file.filename}`;
     }
 
     await brand.save();
@@ -182,10 +180,83 @@ const deleteImage = (imageUrl) => {
   }
 };
 
+const importBrands = async (req, res, next) => {
+     const brandsList = req.body;
+
+    if (!Array.isArray(brandsList)) {
+        return res.status(400).json({ error: "Invalid format. Expected a JSON array." });
+    }
+
+    const report = { successCount: 0, failedBrands: [] };
+
+    for (const brandData of brandsList) {
+        try {
+            const { name, image,brand_slider_image } = brandData;
+
+            // if (!name || !imageUrl) {
+            //     report.failedBrands.push({ brand: brandData, error: "Missing name or imageUrl" });
+            //     continue;
+            // }
+            const completeImage = image?
+             'https://pictures.grocerapps.com/lgthumb/'+image
+             :
+             'https://pictures.grocerapps.com/lgthumb/'+brand_slider_image;
+
+            if(image || brand_slider_image){
+            // 1. Generate a unique filename to prevent overwriting
+            const fileExtension = path.extname(new URL(completeImage).pathname) || '.jpg';
+            const filename = `brand-${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}${fileExtension}`;
+            
+            // Define paths
+            const uploadDir = path.join(__dirname, '../uploads/brands');
+            const absoluteDestinationPath = path.join(uploadDir, filename);
+            var relativeDatabasePath = `/uploads/brands/${filename}`; // Public URL path for your API
+
+            // 2. Ensure directory exists 
+            fs.mkdirSync(uploadDir, { recursive: true })
+            // 3. Download and stream the image directly to the disk
+            const response = await fetch(completeImage);
+            
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            await pipeline(
+                response.body, 
+                fs.createWriteStream(absoluteDestinationPath)
+            );
+          }
+          if(!image && !brand_slider_image) relativeDatabasePath = '';
+
+            // 4. Save parsed data and local image path to your database model
+            const newBrand = new Brand({
+                name: name,
+                image: relativeDatabasePath,
+                isActive: true,   });
+
+            await newBrand.save();
+            report.successCount++;
+
+        } catch (error) {
+            console.error(`Failed to process brand: ${brandData.name || 'Unknown'}`, error);
+            report.failedBrands.push({ 
+                name: brandData.name || 'Unknown', 
+                error: error.message 
+            });
+        }
+    }
+
+    // Return the summary of the bulk process
+    res.status(200).json({
+        message: "Bulk brand import processing complete.",
+        summary: report
+    });
+}
+
+
  module.exports = {
   getBrands,
   // getBrandById,
   createBrand,
   updateBrand,
   deleteBrand,
+  importBrands
 };

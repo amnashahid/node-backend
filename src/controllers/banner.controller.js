@@ -337,4 +337,4 @@ module.exports = {
   getBannerById,
   updateBanner,
   deleteBanner,
-};
+};  

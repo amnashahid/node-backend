@@ -389,7 +389,6 @@ const updateProduct = async (req, res, next) => {
     if (sortOrder !== undefined) {
       product.sortOrder = Number(sortOrder);
     }
-    console.log( `/uploads/products/${req.file.filename}`);
 
     // Replace image
     if (req.file) {
@@ -431,10 +430,43 @@ const deleteProduct = async (req, res, next) => {
   }
 };
 
+const getProductByCategory = async (req, res, next) => {
+  try {
+    const { categoryId } = req.params;
+    const products = await Product.find({ 
+        $or: [
+            { categoryId: categoryId },
+            { subCategoryId: categoryId }
+        ]
+     });
+    return res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+const getProductByBrand = async (req, res, next) => {
+  try {
+    const { brandId } = req.params;
+    const products = await Product.find({ brandId: brandId });
+    return res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   createProduct,
   getProducts,
   getProductById,
   updateProduct,
   deleteProduct,
+  getProductByCategory,
+  getProductByBrand
 };

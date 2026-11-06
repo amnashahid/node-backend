@@ -1,563 +1,451 @@
+const mongoose = require("mongoose");
 const User = require("../models/User");
+const Address = require("../models/Address");
 
-// ============================================
-// GET ALL USERS
-// GET /api/users
-// ============================================
+const addressLabels = ["HOME", "WORK", "OTHER"];
+const profileFields = ["firstName", "lastName", "email", "language"];
+const addressFields = [
+  "label",
+  "addressLine",
+  "area",
+  "latitude",
+  "longitude",
+  "isDefault",
+];
 
-const getUsers = async (req, res, next) => {
-  try {
-    const users = await User.find()
-      .select("-otp")
-      .sort({ createdAt: -1 });
+function getUserId(req) {
+  return req.user.userId;
+}
 
-    res.status(200).json({
-      success: true,
-      count: users.length,
-      data: users,
-    });
-  } catch (error) {
-    next(error);
+function serializeAddress(address) {
+  return {
+    id: address._id,
+    label: address.label,
+    addressLine: address.addressLine,
+    area: address.area,
+    latitude: address.latitude,
+    longitude: address.longitude,
+    isDefault: address.isDefault,
+    createdAt: address.createdAt,
+    updatedAt: address.updatedAt,
+  };
+}
+
+function serializeUser(user, addresses) {
+  return {
+    id: user._id,
+    phone: user.phone,
+    phoneVerified: user.phoneVerified,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email || "",
+    language: user.language,
+    profileCompleted: user.profileCompleted,
+    role: user.role,
+    addresses: addresses.map(serializeAddress),
+  };
+}
+
+function validCoordinates(latitude, longitude) {
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+
+  return (
+    latitude !== undefined &&
+    latitude !== null &&
+    longitude !== undefined &&
+    longitude !== null &&
+    latitude !== "" &&
+    longitude !== "" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180
+  );
+}
+
+function validateAddressFields(body) {
+  if (typeof body.addressLine !== "string" || !body.addressLine.trim()) {
+    return "A delivery address is required.";
   }
-};
 
-// ============================================
-// GET ADMINS
-// GET /api/users/admins
-// ============================================
-
-const getAdmins = async (req, res, next) => {
-  try {
-    const admins = await User.find({
-      role: "admin",
-    })
-      .select("-otp")
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({
-      success: true,
-      count: admins.length,
-      data: admins,
-    });
-  } catch (error) {
-    next(error);
+  if (
+    body.label !== undefined &&
+    !addressLabels.includes(body.label)
+  ) {
+    return "Label must be HOME, WORK, or OTHER.";
   }
-};
 
-// ============================================
-// GET CUSTOMERS
-// GET /api/users/customers
-// ============================================
-
-const getCustomers = async (req, res, next) => {
-  try {
-    const customers = await User.find({
-      role: "customer",
-    })
-      .select("-otp")
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({
-      success: true,
-      count: customers.length,
-      data: customers,
-    });
-  } catch (error) {
-    next(error);
+  if (
+    body.addressLine !== undefined &&
+    (typeof body.addressLine !== "string" || !body.addressLine.trim())
+  ) {
+    return "Address line must be a non-empty string.";
   }
-};
 
-// ============================================
-// GET SINGLE USER
-// GET /api/users/:id
-// ============================================
+  if (body.area !== undefined && typeof body.area !== "string") {
+    return "Area must be a string.";
+  }
 
-const getUserById = async (req, res, next) => {
+  if (!validCoordinates(body.latitude, body.longitude)) {
+    return "Valid latitude and longitude are required.";
+  }
+
+  if (
+    body.isDefault !== undefined &&
+    typeof body.isDefault !== "boolean"
+  ) {
+    return "isDefault must be a boolean.";
+  }
+
+  return null;
+}
+
+function pickFields(body, fields) {
+  return Object.fromEntries(
+    fields
+      .filter((field) => Object.prototype.hasOwnProperty.call(body, field))
+      .map((field) => [field, body[field]])
+  );
+}
+
+async function makeDefaultAddress(userId, addressId) {
+  await Address.updateMany(
+    { userId, _id: { $ne: addressId }, isDefault: true },
+    { $set: { isDefault: false } }
+  );
+}
+
+exports.getProfile = async (req, res, next) => {
   try {
-    const { id } = req.params;
-
-    const user = await User.findById(id)
-      .select("-otp");
+    const user = await User.findOne({ _id: getUserId(req), isActive: true });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "User not found.",
       });
     }
 
-    res.status(200).json({
+    const addresses = await Address.find({ userId: user._id }).sort({
+      isDefault: -1,
+      createdAt: 1,
+    });
+
+    return res.json({
       success: true,
-      data: user,
+      data: { user: serializeUser(user, addresses) },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-// ============================================
-// CREATE USER
-// POST /api/users
-// ============================================
-
-const createUser = async (req, res, next) => {
+exports.updateProfile = async (req, res, next) => {
   try {
-    const {
-      name,
-      phone,
-      email,
-      language,
-      role,
-      isActive,
-      addresses,
-    } = req.body;
-
-    // ----------------------------------------
-    // VALIDATION
-    // ----------------------------------------
-
-    if (!name || !name.trim()) {
+    if (Object.prototype.hasOwnProperty.call(req.body, "phone")) {
       return res.status(400).json({
         success: false,
-        message: "Name is required",
+        message: "Phone number cannot be changed.",
       });
     }
 
-    if (!phone || !phone.trim()) {
+    const updates = pickFields(req.body, profileFields);
+
+    if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Phone is required",
+        message: "Provide at least one profile field to update.",
       });
     }
 
-    if (!role) {
-      return res.status(400).json({
-        success: false,
-        message: "Role is required",
-      });
-    }
-
-    if (!["admin", "customer"].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Role must be either admin or customer",
-      });
-    }
-
-    if (
-      language &&
-      !["en", "ur"].includes(language)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Language must be either en or ur",
-      });
-    }
-
-    // ----------------------------------------
-    // CHECK PHONE
-    // ----------------------------------------
-
-    const existingUser = await User.findOne({
-      phone: phone.trim(),
-    });
-
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "A user with this phone number already exists",
-      });
-    }
-
-    // ----------------------------------------
-    // PROCESS ADDRESSES
-    // ----------------------------------------
-
-    let processedAddresses = [];
-
-    if (Array.isArray(addresses)) {
-      processedAddresses = addresses
-        .filter(
-          (address) =>
-            address &&
-            address.address &&
-            address.address.trim()
-        )
-        .map((address) => ({
-          label:
-            address.label?.trim() ||
-            "Home",
-
-          address:
-            address.address.trim(),
-
-          location:
-            address.location?.trim() ||
-            "",
-
-          latitude:
-            address.latitude !==
-              undefined &&
-            address.latitude !== ""
-              ? Number(address.latitude)
-              : undefined,
-
-          longitude:
-            address.longitude !==
-              undefined &&
-            address.longitude !== ""
-              ? Number(address.longitude)
-              : undefined,
-
-          isDefault:
-            address.isDefault === true,
-        }));
-    }
-
-    // ----------------------------------------
-    // ENSURE ONE DEFAULT ADDRESS
-    // ----------------------------------------
-
-    if (
-      processedAddresses.length > 0 &&
-      !processedAddresses.some(
-        (address) => address.isDefault
-      )
-    ) {
-      processedAddresses[0].isDefault =
-        true;
-    }
-
-    // ----------------------------------------
-    // CREATE USER
-    // ----------------------------------------
-
-    const user = await User.create({
-      firstName: firstName.trim(),
-
-      name:
-        name?.trim() || "",
-
-      phone: phone.trim(),
-
-      email:
-        email?.trim().toLowerCase() || "",
-
-      language: language || "en",
-
-      role,
-
-      isActive:
-        isActive !== false,
-
-      addresses: processedAddresses,
-    });
-
-    // ----------------------------------------
-    // REMOVE OTP
-    // ----------------------------------------
-
-    const responseUser =
-      user.toObject();
-
-    delete responseUser.otp;
-
-    res.status(201).json({
-      success: true,
-      message: "User created successfully",
-      data: responseUser,
-    });
-  } catch (error) {
-    // Duplicate phone protection
-    if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "A user with this phone number already exists",
-      });
-    }
-
-    next(error);
-  }
-};
-
-// ============================================
-// UPDATE USER
-// PUT /api/users/:id
-// ============================================
-
-const updateUser = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const {
-      name,
-      phone,
-      email,
-      language,
-      role,
-      isActive,
-      addresses,
-    } = req.body;
-
-    // ----------------------------------------
-    // FIND USER
-    // ----------------------------------------
-
-    const user = await User.findById(id);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // ----------------------------------------
-    // VALIDATION
-    // ----------------------------------------
-
-    if (
-      name !== undefined &&
-      !name.trim()
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Name is required",
-      });
-    }
-
-    if (
-      role !== undefined &&
-      !["admin", "customer"].includes(role)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Role must be either admin or customer",
-      });
-    }
-
-    if (
-      language !== undefined &&
-      !["en", "ur"].includes(language)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Language must be either en or ur",
-      });
-    }
-
-    // ----------------------------------------
-    // PHONE
-    // ----------------------------------------
-    // Phone is intentionally not changed
-    // from the frontend.
-
-    if (
-      phone !== undefined &&
-      phone !== user.phone
-    ) {
-      const phoneExists =
-        await User.findOne({
-          phone: phone.trim(),
-          _id: { $ne: id },
-        });
-
-      if (phoneExists) {
-        return res.status(409).json({
-          success: false,
-          message:
-            "A user with this phone number already exists",
-        });
-      }
-
-      user.phone = phone.trim();
-    }
-
-    // ----------------------------------------
-    // BASIC INFORMATION
-    // ----------------------------------------
-
-    if (name !== undefined) {
-      user.name =
-        name.trim();
-    }
-
-    // if (lastName !== undefined) {
-    //   user.lastName =
-    //     lastName?.trim() || "";
-    // }
-
-    if (email !== undefined) {
-      user.email =
-        email?.trim().toLowerCase() || "";
-    }
-
-    if (language !== undefined) {
-      user.language = language;
-    }
-
-    if (role !== undefined) {
-      user.role = role;
-    }
-
-    if (isActive !== undefined) {
-      user.isActive = isActive;
-    }
-
-    // ----------------------------------------
-    // ADDRESSES
-    // ----------------------------------------
-
-    if (Array.isArray(addresses)) {
-      const processedAddresses =
-        addresses
-          .filter(
-            (address) =>
-              address &&
-              address.address &&
-              address.address.trim()
-          )
-          .map((address) => ({
-            _id: address._id,
-
-            label:
-              address.label?.trim() ||
-              "Home",
-
-            address:
-              address.address.trim(),
-
-            location:
-              address.location?.trim() ||
-              "",
-
-            latitude:
-              address.latitude !==
-                undefined &&
-              address.latitude !== ""
-                ? Number(address.latitude)
-                : undefined,
-
-            longitude:
-              address.longitude !==
-                undefined &&
-              address.longitude !== ""
-                ? Number(address.longitude)
-                : undefined,
-
-            isDefault:
-              address.isDefault === true,
-          }));
-
-      // Make sure there is only one
-      // default address.
-      let defaultFound = false;
-
-      processedAddresses.forEach(
-        (address) => {
-          if (address.isDefault) {
-            if (!defaultFound) {
-              defaultFound = true;
-            } else {
-              address.isDefault = false;
-            }
-          }
-        }
-      );
-
-      // If there is no default address,
-      // make the first one default.
+    for (const field of ["firstName", "lastName"]) {
       if (
-        processedAddresses.length > 0 &&
-        !processedAddresses.some(
-          (address) => address.isDefault
-        )
+        updates[field] !== undefined &&
+        (typeof updates[field] !== "string" || !updates[field].trim())
       ) {
-        processedAddresses[0].isDefault =
-          true;
+        return res.status(400).json({
+          success: false,
+          message: `${field} must be a non-empty string.`,
+        });
       }
 
-      user.addresses =
-        processedAddresses;
+      if (updates[field] !== undefined) {
+        updates[field] = updates[field].trim();
+      }
     }
 
-    // ----------------------------------------
-    // SAVE
-    // ----------------------------------------
+    if (updates.email !== undefined) {
+      if (
+        typeof updates.email !== "string" ||
+        (updates.email.trim() &&
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updates.email.trim()))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Enter a valid email address.",
+        });
+      }
 
+      updates.email = updates.email.trim().toLowerCase() || undefined;
+    }
+
+    if (
+      updates.language !== undefined &&
+      !["en", "ur"].includes(updates.language)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Language must be en or ur.",
+      });
+    }
+
+    const user = await User.findOne({ _id: getUserId(req), isActive: true });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    Object.assign(user, updates);
+    user.profileCompleted = Boolean(user.firstName && user.lastName);
     await user.save();
 
-    // ----------------------------------------
-    // RESPONSE
-    // ----------------------------------------
+    const addresses = await Address.find({ userId: user._id }).sort({
+      isDefault: -1,
+      createdAt: 1,
+    });
 
-    const responseUser =
-      user.toObject();
-
-    delete responseUser.otp;
-
-    res.status(200).json({
+    return res.json({
       success: true,
-      message: "User updated successfully",
-      data: responseUser,
+      message: "Profile updated successfully.",
+      data: { user: serializeUser(user, addresses) },
     });
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "A user with this phone number already exists",
-      });
+    return next(error);
+  }
+};
+exports.getUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({ isActive: true });
+    const addresses = await Address.find({
+      userId: { $in: users.map((user) => user._id) },
+    }).sort({
+      isDefault: -1,
+      createdAt: 1,
+    });
+    const addressesByUser = new Map();
+
+    for (const address of addresses) {
+      const userId = address.userId.toString();
+      const userAddresses = addressesByUser.get(userId) || [];
+      userAddresses.push(serializeAddress(address));
+      addressesByUser.set(userId, userAddresses);
     }
 
-    next(error);
+    return res.json({
+      success: true,
+      data: {
+        users: users.map((user) => ({
+          ...user.toObject(),
+          addresses: addressesByUser.get(user._id.toString()) || [],
+        })),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+exports.getAddresses = async (req, res, next) => {
+  console.log("Fetching addresses");
+  try {
+    const addresses = await Address.find({ userId: getUserId(req) }).sort({
+      isDefault: -1,
+      createdAt: 1,
+    });
+
+    return res.json({
+      success: true,
+      data: { addresses: addresses.map(serializeAddress) },
+    });
+  } catch (error) {
+    return next(error);
   }
 };
 
-// ============================================
-// DELETE USER
-// DELETE /api/users/:id
-// ============================================
-
-const deleteUser = async (req, res, next) => {
+exports.addAddress = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const validationError = validateAddressFields(req.body);
 
-    const user =
-      await User.findByIdAndDelete(id);
+    if (validationError) {
+      return res.status(400).json({ success: false, message: validationError });
+    }
 
-    if (!user) {
+    const userId = getUserId(req);
+    const hasDefaultAddress = await Address.exists({ userId, isDefault: true });
+    const addressData = pickFields(req.body, addressFields);
+    addressData.label = addressData.label || "HOME";
+    addressData.addressLine = addressData.addressLine.trim();
+    addressData.area = addressData.area?.trim() || "";
+    addressData.latitude = Number(addressData.latitude);
+    addressData.longitude = Number(addressData.longitude);
+    addressData.isDefault = addressData.isDefault === true || !hasDefaultAddress;
+
+    const address = await Address.create({ ...addressData, userId });
+
+    if (address.isDefault) {
+      await makeDefaultAddress(userId, address._id);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Address added successfully.",
+      data: { address: serializeAddress(address) },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.updateAddress = async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.addressId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid address ID.",
+      });
+    }
+
+    const updates = pickFields(req.body, addressFields);
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide at least one address field to update.",
+      });
+    }
+
+    const userId = getUserId(req);
+    const existingAddress = await Address.findOne({
+      _id: req.params.addressId,
+      userId,
+    });
+
+    if (!existingAddress) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "Address not found.",
       });
     }
 
-    res.status(200).json({
+    const effectiveAddress = {
+      ...existingAddress.toObject(),
+      ...updates,
+    };
+    const validationError = validateAddressFields(effectiveAddress);
+    if (validationError) {
+      return res.status(400).json({ success: false, message: validationError });
+    }
+
+    if (updates.addressLine !== undefined) {
+      updates.addressLine = updates.addressLine.trim();
+    }
+    if (updates.area !== undefined) {
+      updates.area = updates.area.trim();
+    }
+    if (updates.latitude !== undefined) {
+      updates.latitude = Number(updates.latitude);
+    }
+    if (updates.longitude !== undefined) {
+      updates.longitude = Number(updates.longitude);
+    }
+
+    let promoteAddress = null;
+    if (existingAddress.isDefault && updates.isDefault === false) {
+      promoteAddress = await Address.findOne({
+        userId,
+        _id: { $ne: existingAddress._id },
+      }).sort({ createdAt: 1 });
+
+      if (!promoteAddress) {
+        return res.status(400).json({
+          success: false,
+          message: "The only saved address must remain the default address.",
+        });
+      }
+    }
+
+    const address = await Address.findOneAndUpdate(
+      { _id: req.params.addressId, userId },
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    if (!address) {
+      return res.status(404).json({
+        success: false,
+        message: "Address not found.",
+      });
+    }
+
+    if (address.isDefault) {
+      await makeDefaultAddress(userId, address._id);
+    }
+    if (promoteAddress) {
+      promoteAddress.isDefault = true;
+      await promoteAddress.save();
+    }
+
+    return res.json({
       success: true,
-      message: "User deleted successfully",
+      message: "Address updated successfully.",
+      data: { address: serializeAddress(address) },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-// ============================================
-// EXPORT
-// ============================================
+exports.deleteAddress = async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.addressId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid address ID.",
+      });
+    }
 
-module.exports = {
-  getUsers,
-  getAdmins,
-  getCustomers,
-  getUserById,
-  createUser,
-  updateUser,
-  deleteUser,
+    const userId = getUserId(req);
+    const address = await Address.findOneAndDelete({
+      _id: req.params.addressId,
+      userId,
+    });
+
+    if (!address) {
+      return res.status(404).json({
+        success: false,
+        message: "Address not found.",
+      });
+    }
+
+    if (address.isDefault) {
+      const nextDefault = await Address.findOne({ userId }).sort({
+        createdAt: 1,
+      });
+      if (nextDefault) {
+        nextDefault.isDefault = true;
+        await nextDefault.save();
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Address deleted successfully.",
+    });
+  } catch (error) {
+    return next(error);
+  }
 };

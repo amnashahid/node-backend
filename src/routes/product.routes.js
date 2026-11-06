@@ -8,6 +8,8 @@ const {
   getProductById,
   updateProduct,
   deleteProduct,
+  getProductByCategory,
+  getProductByBrand
 } = require("../controllers/product.controller");
 
 const uploadProductImage = require("../middleware/productUpload.middleware");
@@ -18,6 +20,8 @@ const roleMiddleware = require("../middleware/role.middleware");
 // Customer/public viewing
 router.get("/", getProducts);
 router.get("/:id", getProductById);
+router.get("/category/:categoryId", getProductByCategory);
+router.get("/brand/:brandId", getProductByBrand);
 
 // Admin
 router.post(

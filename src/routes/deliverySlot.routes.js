@@ -1,32 +1,16 @@
 const express = require("express");
+const controller = require("../controllers/deliverySlot.controller");
+const authenticate = require("../middleware/auth.middleware");
+const authorizeRoles = require("../middleware/role.middleware");
 
 const router = express.Router();
 
-const {
-  getDeliverySlots,
-  getDeliverySlotsByDay,
-  createDeliverySlot,
-  updateDeliverySlot,
-  deleteDeliverySlot,
-} = require("../controllers/deliverySlot.controller");
+router.get("/available", authenticate,controller.getAvailable);
+router.get("/upcoming", authenticate, controller.getUpcoming);
 
-// Get all slots
-router.get("/", getDeliverySlots);
-
-// Get active slots for a specific day
-// 0 = Sunday
-// 1 = Monday
-// ...
-// 6 = Saturday
-router.get("/day/:dayOfWeek", getDeliverySlotsByDay);
-
-// Create
-router.post("/", createDeliverySlot);
-
-// Update
-router.put("/:id", updateDeliverySlot);
-
-// Delete
-router.delete("/:id", deleteDeliverySlot);
+router.get("/", authenticate, authorizeRoles("admin"), controller.getSlots);
+router.post("/", authenticate, authorizeRoles("admin"), controller.createSlot);
+router.put("/:id", authenticate, authorizeRoles("admin"), controller.updateSlot);
+router.delete("/:id", authenticate, authorizeRoles("admin"), controller.deleteSlot);
 
 module.exports = router;
